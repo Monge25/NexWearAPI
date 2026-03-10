@@ -1,0 +1,47 @@
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build results
+bin/
+obj/
+out/
+
+## .NET
+*.dll
+*.exe
+*.pdb
+*.cache
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!**/packages/build/
+
+## Rider
+.idea/
+*.sln.iml
+
+## VS Code
+.vscode/
+
+## Logs
+*.log
+logs/
+
+## Sensitive config
+appsettings.Development.json
+appsettings.Production.json
+
+## OS
+.DS_Store
+Thumbs.db
+desktop.ini

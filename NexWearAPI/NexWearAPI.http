@@ -1,0 +1,6 @@
+@NexWearAPI_HostAddress = http://localhost:5245
+
+GET {{NexWearAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
