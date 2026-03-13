@@ -82,6 +82,7 @@ builder.Services.AddCors(options =>
 // ── Servicios propios ─────────────────────────────────────────
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 var app = builder.Build();
 
