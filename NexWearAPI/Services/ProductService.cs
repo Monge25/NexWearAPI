@@ -1,7 +1,8 @@
-﻿using NexWearAPI.Data;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using NexWearAPI.Data;
 using NexWearAPI.DTOs;
 using NexWearAPI.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace NexWearAPI.Services
 {
@@ -13,6 +14,7 @@ namespace NexWearAPI.Services
         Task<ProductResponseDto> CreateAsync(CreateProductDto dto);
         Task<ProductResponseDto?> UpdateAsync(Guid id, UpdateProductDto dto);
         Task<bool> DeleteAsync(Guid id);
+        Task<IActionResult> UploadImageAsync(Guid id, IFormFile file);
     }
 
     // ── Implementación ───────────────────────────────────────────
@@ -134,5 +136,10 @@ namespace NexWearAPI.Services
             IsActive = p.IsActive,
             CreatedAt = p.CreatedAt
         };
+
+        public Task<IActionResult> UploadImageAsync(Guid id, IFormFile file)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
