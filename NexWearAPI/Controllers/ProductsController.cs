@@ -10,11 +10,13 @@ namespace NexWearAPI.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;
+        private readonly IImageService _imageService;
         private readonly ILogger<ProductsController> _logger;
 
-        public ProductsController(IProductService productService, ILogger<ProductsController> logger)
+        public ProductsController(IProductService productService, IImageService imageService, ILogger<ProductsController> logger)
         {
             _productService = productService;
+            _imageService = imageService;
             _logger = logger;
         }
 
@@ -92,6 +94,33 @@ namespace NexWearAPI.Controllers
             _logger.LogInformation("Producto desactivado: {Id} a las {Time}", id, DateTime.UtcNow);
 
             return NoContent();
+        }
+
+        /// <summary>Subir imagen de producto a cloudinary</summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost("{id:guid}/image")]
+        public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
+        {
+            var product = await _productService.GetProductByIdAsync(id);
+
+            // Verificar existencia
+            if (product is null)
+                return NotFound(new { message = "Producto no encontrado." });
+
+            var imageUrl = await _imageService.UploadImageAsync(file);
+
+            if (imageUrl is null)
+                return BadRequest(new { message = "Archivo inválido. Solo se permiten imágenes JPG, PNG o WEBP de máximo 5MB." });
+
+            // Actualizar la URL de imágen en el producto
+            var updated = await _productService.UpdateAsync(id, new UpdateProductDto
+            {
+                ImageUrl = imageUrl
+            });
+
+            _logger.LogInformation("Imágen subida para producto {Id}: {Url}", id, imageUrl);
+
+            return Ok(new { imageUrl = product = updated });
         }
     }
 }

@@ -7,6 +7,7 @@ using NexWearAPI.Services;
 using System.Text;
 using Microsoft.OpenApi.Models;
 using NexWearAPI.Models;
+using NexWearAPI.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +41,9 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
+
+    // Soporte para subida de archivos
+    options.OperationFilter<FileUploadOperationFilter>();
 });
 
 // ── Entity Framework + PostgreSQL ────────────────────────────
@@ -83,6 +87,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IImageService, ImageService>();
 
 var app = builder.Build();
 
