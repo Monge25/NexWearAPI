@@ -3,6 +3,7 @@
 namespace NexWearAPI.DTOs
 {
     // ── Request: Crear producto ──────────────────────────────────
+    // ── Request: Crear producto ──────────────────────────────────
     public class CreateProductDto
     {
         [Required(ErrorMessage = "El nombre del producto es obligatorio")]
@@ -11,22 +12,12 @@ namespace NexWearAPI.DTOs
 
         public string? Description { get; set; }
 
-        [Required(ErrorMessage = "La cantidad del precio es obligatorio")]
+        [Required(ErrorMessage = "El precio es obligatorio")]
         [Range(0.01, 999999.99, ErrorMessage = "El precio debe ser mayor a 0")]
-        public decimal Price { get; set; }
-
-        [Required(ErrorMessage = "El stock es obligatorio")]
-        [Range(0, int.MaxValue, ErrorMessage = "El stock no puede ser negativo")]
-        public int Stock { get; set; }
-
-        [MaxLength(20)]
-        public string? Size { get; set; }
-
-        [MaxLength(50)]
-        public string? Color { get; set; }
+        public decimal Price { get; set; }          // Precio base, las variantes lo ajustan
 
         [MaxLength(500)]
-        public string? ImageUrl { get; set; }
+        public string? ImageUrl { get; set; }       // Imagen principal del producto
 
         [Required(ErrorMessage = "La categoría es obligatoria")]
         [MaxLength(100)]
@@ -44,15 +35,6 @@ namespace NexWearAPI.DTOs
         [Range(0.01, 999999.99, ErrorMessage = "El precio debe ser mayor a 0")]
         public decimal? Price { get; set; }
 
-        [Range(0, int.MaxValue, ErrorMessage = "El stock no puede ser negativo")]
-        public int? Stock { get; set; }
-
-        [MaxLength(20)]
-        public string? Size { get; set; }
-
-        [MaxLength(50)]
-        public string? Color { get; set; }
-
         [MaxLength(500)]
         public string? ImageUrl { get; set; }
 
@@ -62,20 +44,34 @@ namespace NexWearAPI.DTOs
         public bool? IsActive { get; set; }
     }
 
-    // ── Response: Producto ───────────────────────────────────────
-    // A04 - Nunca exponemos la entidad directamente, usamos un DTO
+    // ── Response: Producto simple (sin variantes) ─────────────────
+    // A04 - Nunca exponemos la entidad directamente
     public class ProductResponseDto
     {
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
         public decimal Price { get; set; }
-        public int Stock { get; set; }
-        public string? Size { get; set; }
-        public string? Color { get; set; }
         public string? ImageUrl { get; set; }
         public string Category { get; set; } = string.Empty;
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
+    }
+
+    // ── Response: Producto con variantes incluidas ────────────────
+    // Se usa cuando el frontend necesita mostrar colores/tallas disponibles
+    public class ProductWithVariantsDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public decimal BasePrice { get; set; }
+        public string? ImageUrl { get; set; }
+        public string Category { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+
+        // Variantes agrupadas para el frontend
+        public IEnumerable<VariantResponseDto> Variants { get; set; } = new List<VariantResponseDto>();
     }
 }

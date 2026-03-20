@@ -15,28 +15,21 @@ namespace NexWearAPI.Models
         public string? Description { get; set; }
 
         [Required]
-        public decimal Price { get; set; }
-
-        public int Stock { get; set; } = 0;
-
-        [MaxLength(20)]
-        public string? Size { get; set; }       // XS, S, M, L, XL / 38, 40, 42...
-
-        [MaxLength(50)]
-        public string? Color { get; set; }
+        public decimal Price { get; set; }         // Precio base
 
         [MaxLength(500)]
-        public string? ImageUrl { get; set; }
+        public string? ImageUrl { get; set; }      // Imagen principal del producto
 
         [Required]
         [MaxLength(100)]
-        public string Category { get; set; } = string.Empty;  // Ropa, Calzado, Accesorios
+        public string Category { get; set; } = string.Empty;
 
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navegación
+        public ICollection<ProductVariant> Variants { get; set; } = new List<ProductVariant>();
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
         public ICollection<Review> Reviews { get; set; } = new List<Review>();

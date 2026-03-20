@@ -14,7 +14,7 @@ namespace NexWearAPI.Services
         Task<ProductResponseDto> CreateAsync(CreateProductDto dto);
         Task<ProductResponseDto?> UpdateAsync(Guid id, UpdateProductDto dto);
         Task<bool> DeleteAsync(Guid id);
-        Task<IActionResult> UploadImageAsync(Guid id, IFormFile file);
+        // Task<IActionResult> UploadImageAsync(Guid id, IFormFile file);
     }
 
     // ── Implementación ───────────────────────────────────────────
@@ -68,9 +68,6 @@ namespace NexWearAPI.Services
                 Name = dto.Name.Trim(),
                 Description = dto.Description?.Trim(),
                 Price = dto.Price,
-                Stock = dto.Stock,
-                Size = dto.Size?.Trim(),
-                Color = dto.Color?.Trim(),
                 ImageUrl = dto.ImageUrl?.Trim(),
                 Category = dto.Category.Trim(),
                 IsActive = true
@@ -93,9 +90,6 @@ namespace NexWearAPI.Services
             if (dto.Name is not null) product.Name = dto.Name.Trim();
             if (dto.Description is not null) product.Description = dto.Description.Trim();
             if (dto.Price is not null) product.Price = dto.Price.Value;
-            if (dto.Stock is not null) product.Stock = dto.Stock.Value;
-            if (dto.Size is not null) product.Size = dto.Size.Trim();
-            if (dto.Color is not null) product.Color = dto.Color.Trim();
             if (dto.ImageUrl is not null) product.ImageUrl = dto.ImageUrl.Trim();
             if (dto.Category is not null) product.Category = dto.Category.Trim();
             if (dto.IsActive is not null) product.IsActive = dto.IsActive.Value;
@@ -128,18 +122,38 @@ namespace NexWearAPI.Services
             Name = p.Name,
             Description = p.Description,
             Price = p.Price,
-            Stock = p.Stock,
-            Size = p.Size,
-            Color = p.Color,
             ImageUrl = p.ImageUrl,
             Category = p.Category,
             IsActive = p.IsActive,
             CreatedAt = p.CreatedAt
         };
 
-        public Task<IActionResult> UploadImageAsync(Guid id, IFormFile file)
+        private static ProductWithVariantsDto MapToDtoWithVariants(Product p) => new()
         {
-            throw new NotImplementedException();
-        }
+            Id = p.Id,
+            Name = p.Name,
+            Description = p.Description,
+            BasePrice = p.Price,
+            ImageUrl = p.ImageUrl,
+            Category = p.Category,
+            IsActive = p.IsActive,
+            CreatedAt = p.CreatedAt,
+            Variants = p.Variants.Select(v => new VariantResponseDto
+            {
+                Id = v.Id,
+                Color = v.Color,
+                ColorHex = v.ColorHex,
+                Size = v.Size,
+                PriceModifier = v.PriceModifier,
+                FinalPrice = p.Price + v.PriceModifier,
+                Stock = v.Stock,
+                ImageUrl = v.ImageUrl,
+                IsActive = v.IsActive
+            })
+        };
+        //public Task<IActionResult> UploadImageAsync(Guid id, IFormFile file)
+        //{
+        //    throw new NotImplementedException();
+        //}
     }
 }
