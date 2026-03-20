@@ -13,6 +13,7 @@ namespace NexWearAPI.Data
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<CartItem> CartItems { get; set; }
         public DbSet<Review> Reviews { get; set; }
+        public DbSet<ProductVariant> ProductVariants { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -112,6 +113,14 @@ namespace NexWearAPI.Data
 
             modelBuilder.Entity<Review>()
                 .HasIndex(r => r.ProductId);
+
+            // ── ProductVariants ──────────────────────────────────────────
+            modelBuilder.Entity<ProductVariant>()
+                .Property(v => v.PriceModifier)
+                .HasPrecision(10, 2);
+
+            modelBuilder.Entity<ProductVariant>()
+                .HasOne(v => v.Product);    // Índice para cargar variantes rápido
         }
     }
 }
