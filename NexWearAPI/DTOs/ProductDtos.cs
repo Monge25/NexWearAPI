@@ -3,7 +3,6 @@
 namespace NexWearAPI.DTOs
 {
     // ── Request: Crear producto ──────────────────────────────────
-    // ── Request: Crear producto ──────────────────────────────────
     public class CreateProductDto
     {
         [Required(ErrorMessage = "El nombre del producto es obligatorio")]
@@ -22,6 +21,12 @@ namespace NexWearAPI.DTOs
         [Required(ErrorMessage = "La categoría es obligatoria")]
         [MaxLength(100)]
         public string Category { get; set; } = string.Empty;
+
+        [MaxLength(255)]
+        public string? Care { get; set; }
+
+        [MaxLength(100)]
+        public string? Origin { get; set; }
     }
 
     // ── Request: Actualizar producto ─────────────────────────────
@@ -42,6 +47,12 @@ namespace NexWearAPI.DTOs
         public string? Category { get; set; }
 
         public bool? IsActive { get; set; }
+
+        [MaxLength(255)]
+        public string? Care { get; set; }
+
+        [MaxLength(100)]
+        public string? Origin { get; set; }
     }
 
     // ── Response: Producto simple (sin variantes) ─────────────────
@@ -56,6 +67,8 @@ namespace NexWearAPI.DTOs
         public string Category { get; set; } = string.Empty;
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string? Care { get; set; }
+        public string? Origin { get; set; }
     }
 
     // ── Response: Producto con variantes incluidas ────────────────
@@ -70,6 +83,8 @@ namespace NexWearAPI.DTOs
         public string Category { get; set; } = string.Empty;
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string? Care { get; set; }
+        public string? Origin { get; set; }
 
         // Variantes agrupadas para el frontend
         public IEnumerable<VariantResponseDto> Variants { get; set; } = new List<VariantResponseDto>();

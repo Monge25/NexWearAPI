@@ -27,6 +27,12 @@ namespace NexWearAPI.Models
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        
+        [MaxLength(500)]
+        public string? Care { get; set; }
+
+        [MaxLength(50)]
+        public string? Origin { get; set; }
 
         // Navegación
         public ICollection<ProductVariant> Variants { get; set; } = new List<ProductVariant>();

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using CloudinaryDotNet.Core;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NexWearAPI.Data;
 using NexWearAPI.DTOs;
@@ -9,7 +10,15 @@ namespace NexWearAPI.Services
     // ── Interface ────────────────────────────────────────────────
     public interface IProductService
     {
-        Task<IEnumerable<ProductResponseDto>> GetAllProductsAsync(string? category, string? search);
+        Task<PagedResult<ProductResponseDto>> GetAllProductsAsync(
+            string? category, 
+            string? search, 
+            decimal? minPrice, 
+            decimal? maxPrice, 
+            string? sortBy, 
+            bool? isOnSale,
+            int page,
+            int pageSize);
         Task<ProductResponseDto?> GetProductByIdAsync(Guid id);
         Task<ProductResponseDto> CreateAsync(CreateProductDto dto);
         Task<ProductResponseDto?> UpdateAsync(Guid id, UpdateProductDto dto);
@@ -29,8 +38,20 @@ namespace NexWearAPI.Services
 
         // ── Listar productos ──────────────────────────────────────
         // A01 - Endpoint público, solo muestra productos activos
-        public async Task<IEnumerable<ProductResponseDto>> GetAllProductsAsync(string? category, string? search)
+        public async Task<PagedResult<ProductResponseDto>> GetAllProductsAsync(
+
+            string? category, 
+            string? search, 
+            decimal? minPrice, 
+            decimal? maxPrice, 
+            string? sortBy, 
+            bool? isOnSale,
+            int page = 1,
+            int pageSize = 10)
         {
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize > 50 ? 50 : pageSize; // límite máximo de 50
+
             // A03 - EF Core usa queries parametrizados, nunca SQL crudo
             var query = _context.Products
                 .Where(p => p.IsActive)
@@ -44,11 +65,40 @@ namespace NexWearAPI.Services
                     p.Name.ToLower().Contains(search.ToLower()) ||
                     (p.Description != null && p.Description.ToLower().Contains(search.ToLower())));
 
+            if (minPrice.HasValue)
+                query = query.Where(p => p.Price >= minPrice.Value);
+
+            if (maxPrice.HasValue)
+                query = query.Where(p => p.Price <= maxPrice.Value);
+
+            if (isOnSale == true)
+                query = query.Where(p => p.Variants.Any(v => v.IsOnSale && v.IsActive));
+
+            query = sortBy switch
+            {
+                "price_asc" => query.OrderBy(p => p.Price),
+                "price_desc" => query.OrderByDescending(p => p.Price),
+                "createdAt_asc" => query.OrderBy(p => p.CreatedAt),
+                "createdAt_desc" => query.OrderByDescending(p => p.CreatedAt),
+                _ => query.OrderByDescending(p => p.CreatedAt)
+            };
+
+            var totalCount = await query.CountAsync();
+
             var products = await query
-                .OrderByDescending(p => p.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
 
-            return products.Select(MapToDto);
+            return new PagedResult<ProductResponseDto>
+            {
+                Items = products.Select(MapToDto),
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+
+            // return products.Select(MapToDto);
         }
 
         // ── Obtener producto por ID ───────────────────────────────
@@ -70,7 +120,9 @@ namespace NexWearAPI.Services
                 Price = dto.Price,
                 ImageUrl = dto.ImageUrl?.Trim(),
                 Category = dto.Category.Trim(),
-                IsActive = true
+                IsActive = true,
+                Care = dto.Care?.Trim(),
+                Origin = dto.Origin?.Trim()
             };
 
             _context.Products.Add(product);
@@ -93,6 +145,8 @@ namespace NexWearAPI.Services
             if (dto.ImageUrl is not null) product.ImageUrl = dto.ImageUrl.Trim();
             if (dto.Category is not null) product.Category = dto.Category.Trim();
             if (dto.IsActive is not null) product.IsActive = dto.IsActive.Value;
+            if (dto.Care is not null) product.Care = dto.Care.Trim();
+            if (dto.Origin is not null) product.Origin = dto.Origin.Trim();
 
             await _context.SaveChangesAsync();
 
@@ -125,7 +179,9 @@ namespace NexWearAPI.Services
             ImageUrl = p.ImageUrl,
             Category = p.Category,
             IsActive = p.IsActive,
-            CreatedAt = p.CreatedAt
+            CreatedAt = p.CreatedAt,
+            Care = p.Care,
+            Origin = p.Origin
         };
 
         private static ProductWithVariantsDto MapToDtoWithVariants(Product p) => new()

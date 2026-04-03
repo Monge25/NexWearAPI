@@ -26,9 +26,15 @@ namespace NexWearAPI.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] string? category,
-            [FromQuery] string? search)
+            [FromQuery] string? search,
+            [FromQuery] decimal? minPrice,
+            [FromQuery] decimal? maxPrice,
+            [FromQuery] string? sortBy, 
+            [FromQuery] bool? isOnSale,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
-            var products = await _productService.GetAllProductsAsync(category, search);
+            var products = await _productService.GetAllProductsAsync(category, search, minPrice, maxPrice, sortBy, isOnSale, page, pageSize);
             return Ok(products);
         }
 

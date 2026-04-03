@@ -29,6 +29,7 @@ namespace NexWearAPI.Models
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public bool IsOnSale { get; set; } = false;
 
         // Navegación
         public Product Product { get; set; } = null!;
