@@ -63,7 +63,8 @@ namespace NexWearAPI.Services
                 Size = dto.Size?.Trim(),
                 PriceModifier = dto.PriceModifier,
                 Stock = dto.Stock,
-                IsActive = true
+                IsActive = true,
+                IsOnSale = dto.IsOnSale
             };
 
             _context.ProductVariants.Add(variant);
@@ -88,6 +89,7 @@ namespace NexWearAPI.Services
             if (dto.PriceModifier is not null) variant.PriceModifier = dto.PriceModifier.Value;
             if (dto.Stock is not null) variant.Stock = dto.Stock.Value;
             if (dto.IsActive is not null) variant.IsActive = dto.IsActive.Value;
+            if (dto.IsOnSale is not null) variant.IsOnSale = dto.IsOnSale.Value;
 
             await _context.SaveChangesAsync();
             return MapToDto(variant, product.Price);
@@ -140,7 +142,8 @@ namespace NexWearAPI.Services
             FinalPrice = basePrice + v.PriceModifier,  // precio final calculado
             Stock = v.Stock,
             ImageUrl = v.ImageUrl,
-            IsActive = v.IsActive
+            IsActive = v.IsActive,
+            IsOnSale = v.IsOnSale
         };
     }
 }

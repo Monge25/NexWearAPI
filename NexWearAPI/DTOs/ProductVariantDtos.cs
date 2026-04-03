@@ -19,6 +19,7 @@ namespace NexWearAPI.DTOs
         [Required]
         [Range(0, int.MaxValue, ErrorMessage = "El stock no puede ser negativo")]
         public int Stock { get; set; }
+        public bool IsOnSale { get; set; }
     }
 
     // ── Request: Actualizar variante ─────────────────────────────
@@ -39,6 +40,7 @@ namespace NexWearAPI.DTOs
         public int? Stock { get; set; }
 
         public bool? IsActive { get; set; }
+        public bool? IsOnSale { get; set; }
     }
 
     // ── Response: Variante ───────────────────────────────────────
@@ -53,5 +55,6 @@ namespace NexWearAPI.DTOs
         public int Stock { get; set; }
         public string? ImageUrl { get; set; }
         public bool IsActive { get; set; }
+        public bool IsOnSale { get; set; }
     }
 }
