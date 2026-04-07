@@ -6,7 +6,6 @@ using NexWearAPI.Data;
 using NexWearAPI.Services;
 using System.Text;
 using Microsoft.OpenApi.Models;
-using NexWearAPI.Models;
 using NexWearAPI.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -89,6 +88,8 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IImageService, ImageService>();
 builder.Services.AddScoped<IProductVariantService, ProductVariantService>();
+builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 
 var app = builder.Build();
 

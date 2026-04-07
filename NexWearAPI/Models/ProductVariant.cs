@@ -30,6 +30,7 @@ namespace NexWearAPI.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public bool IsOnSale { get; set; } = false;
+        public decimal? SalePrice { get; set; }
 
         // Navegación
         public Product Product { get; set; } = null!;
