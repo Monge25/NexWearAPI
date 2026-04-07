@@ -74,11 +74,13 @@ namespace NexWearAPI.Data
                 .HasForeignKey(oi => oi.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);  // No borrar producto si tiene órdenes
 
-            // ── CartItems ────────────────────────────────────────
-            modelBuilder.Entity<CartItem>()
-                .HasIndex(c => new { c.UserId, c.ProductId })
-                .IsUnique();    // Un usuario no puede tener el mismo producto dos veces en el carrito
+            modelBuilder.Entity<OrderItem>()
+                .HasOne(oi => oi.Variant)
+                .WithMany()
+                .HasForeignKey(oi => oi.VariantId)
+                .OnDelete(DeleteBehavior.Restrict);
 
+            // ── CartItems ────────────────────────────────────────
             modelBuilder.Entity<CartItem>()
                 .HasOne(c => c.User)
                 .WithMany(u => u.CartItems)
@@ -92,7 +94,15 @@ namespace NexWearAPI.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<CartItem>()
-                .HasIndex(c => c.UserId);
+                .HasOne(c => c.Variant)
+                .WithMany()
+                .HasForeignKey(c => c.VariantId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // UNIQUE: un usuario no puede tener la misma variante dos veces
+            modelBuilder.Entity<CartItem>()
+                .HasIndex(c => new { c.UserId, c.VariantId })
+                .IsUnique();
 
             // ── Reviews ──────────────────────────────────────────
             modelBuilder.Entity<Review>()
