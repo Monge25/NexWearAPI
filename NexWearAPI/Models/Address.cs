@@ -2,16 +2,7 @@
 
 namespace NexWearAPI.Models
 {
-    public enum OrderStatus
-    {
-        Pending,
-        Paid,
-        Shipped,
-        Delivered,
-        Cancelled
-    }
-
-    public class Order
+    public class Address
     {
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
@@ -19,20 +10,16 @@ namespace NexWearAPI.Models
         [Required]
         public Guid UserId { get; set; }
 
-        public OrderStatus Status { get; set; } = OrderStatus.Pending;
-
         [Required]
-        public decimal Total { get; set; }
+        [MaxLength(50)]
+        public string Alias { get; set; } = string.Empty;  // "Casa", "Trabajo", etc.
 
-        // ── Snapshot de la dirección al momento de comprar ────────
-        // Nunca como FK — si el usuario borra su dirección,
-        // la orden sigue teniendo el dato completo
         [Required]
         [MaxLength(255)]
-        public string Street { get; set; } = string.Empty;
+        public string Street { get; set; } = string.Empty; // Calle y número
 
         [MaxLength(100)]
-        public string? Interior { get; set; }
+        public string? Interior { get; set; }              // Depto, piso, etc.
 
         [Required]
         [MaxLength(100)]
@@ -51,12 +38,13 @@ namespace NexWearAPI.Models
         public string Country { get; set; } = "México";
 
         [MaxLength(20)]
-        public string? Phone { get; set; }
+        public string? Phone { get; set; }                 // Teléfono de contacto
+
+        public bool IsDefault { get; set; } = false;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navegación
         public User User { get; set; } = null!;
-        public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
     }
 }

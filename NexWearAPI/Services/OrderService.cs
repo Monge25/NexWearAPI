@@ -2,6 +2,7 @@
 using NexWearAPI.Data;
 using NexWearAPI.DTOs;
 using NexWearAPI.Models;
+using System.Net;
 
 namespace NexWearAPI.Services
 {
@@ -19,7 +20,6 @@ namespace NexWearAPI.Services
             _context = context;
         }
 
-        // ── Checkout convierte el carrito en una orden ──────────
         public async Task<OrderResponseDto> CheckoutAsync(Guid userId, CheckoutDto dto)
         {
             // 1. Obtener carrito del usuario
@@ -36,13 +36,68 @@ namespace NexWearAPI.Services
             foreach (var item in cartItems)
             {
                 if (!item.Variant.IsActive)
-                    throw new InvalidOperationException($"'{item.Product.Name} - {item.Variant.Color} {item.Variant.Size}' ya no está disponible.");
+                    throw new InvalidOperationException(
+                        $"'{item.Product.Name} - {item.Variant.Color} {item.Variant.Size}' ya no está disponible.");
 
                 if (item.Variant.Stock < item.Quantity)
-                    throw new InvalidOperationException($"Stock insuficiente para '{item.Product.Name} - {item.Variant.Size}'. Disponible: {item.Variant.Stock}");
+                    throw new InvalidOperationException(
+                        $"Stock insuficiente para '{item.Product.Name} - {item.Variant.Size}'. Disponible: {item.Variant.Stock}");
             }
 
-            // 3. Calcular el total a pagar para realizar la orden
+            // 3. Resolver dirección — variables separadas para el snapshot
+            string street, city, state, zipCode, country;
+            string? interior, phone;
+
+            if (dto.AddressId.HasValue)
+            {
+                // Usar dirección guardada
+                var saved = await _context.Addresses
+                    .FirstOrDefaultAsync(a => a.Id == dto.AddressId && a.UserId == userId);
+
+                if (saved is null)
+                    throw new InvalidOperationException("Dirección no encontrada.");
+
+                street = saved.Street;
+                interior = saved.Interior;
+                city = saved.City;
+                state = saved.State;
+                zipCode = saved.ZipCode;
+                country = saved.Country;
+                phone = saved.Phone;
+            }
+            else
+            {
+                // Usar dirección escrita en el checkout
+                if (string.IsNullOrWhiteSpace(dto.Street) || string.IsNullOrWhiteSpace(dto.City))
+                    throw new InvalidOperationException("Se requiere una dirección de envío.");
+
+                street = dto.Street!;
+                interior = dto.Interior;
+                city = dto.City!;
+                state = dto.State ?? "";
+                zipCode = dto.ZipCode ?? "";
+                country = dto.Country ?? "México";
+                phone = dto.Phone;
+
+                // Guardar como nueva dirección si el usuario lo pidió
+                if (dto.SaveAddress && !string.IsNullOrWhiteSpace(dto.AddressAlias))
+                {
+                    _context.Addresses.Add(new Address
+                    {
+                        UserId = userId,
+                        Alias = dto.AddressAlias,
+                        Street = street,
+                        Interior = interior,
+                        City = city,
+                        State = state,
+                        ZipCode = zipCode,
+                        Country = country,
+                        Phone = phone,
+                    });
+                }
+            }
+
+            // 4. Calcular items y total
             var orderItems = cartItems.Select(c =>
             {
                 var price = c.Variant.IsOnSale && c.Variant.SalePrice.HasValue
@@ -55,37 +110,40 @@ namespace NexWearAPI.Services
                     VariantId = c.VariantId,
                     Quantity = c.Quantity,
                     UnitPrice = price,
-                    ProductName = c.Product.Name, // snapshot
-                    VariantColor = c.Variant.Color, // snapshot
-                    VariantSize = c.Variant.Size // snapshot
+                    ProductName = c.Product.Name,
+                    VariantColor = c.Variant.Color,
+                    VariantSize = c.Variant.Size,
                 };
             }).ToList();
 
             var total = orderItems.Sum(i => i.UnitPrice * i.Quantity);
 
-            // 4. Crear la orden
+            // 5. Crear la orden con snapshot de dirección
             var order = new Order
             {
                 UserId = userId,
                 Status = OrderStatus.Paid,
                 Total = total,
-                ShippingAddress = dto.ShippingAddress,
-                OrderItems = orderItems
+                Street = street,
+                Interior = interior,
+                City = city,
+                State = state,
+                ZipCode = zipCode,
+                Country = country,
+                Phone = phone,
+                OrderItems = orderItems,
             };
 
             _context.Orders.Add(order);
 
-            // 5. Descontar producto del stock de cada variante
+            // 6. Descontar stock de cada variante
             foreach (var item in cartItems)
-            {
                 item.Variant.Stock -= item.Quantity;
-            }
 
-            // 6. Vaciar el carrito automaticamente
+            // 7. Vaciar carrito automáticamente
             _context.CartItems.RemoveRange(cartItems);
 
             await _context.SaveChangesAsync();
-
             return MapToDto(order);
         }
 
@@ -123,8 +181,14 @@ namespace NexWearAPI.Services
             OrderNumber = $"ORD-{order.Id.ToString()[..8].ToUpper()}",
             Status = order.Status.ToString(),
             Total = order.Total,
-            ShippingAddress = order.ShippingAddress,
             CreatedAt = order.CreatedAt,
+            Street = order.Street,
+            Interior = order.Interior,
+            City = order.City,
+            State = order.State,
+            ZipCode = order.ZipCode,
+            Country = order.Country,
+            Phone = order.Phone,
             Items = order.OrderItems.Select(i => new OrderItemResponseDto
             {
                 Id = i.Id,
