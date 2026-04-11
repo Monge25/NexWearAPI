@@ -4,8 +4,21 @@ namespace NexWearAPI.DTOs
 {
     public class CheckoutDto
     {
-        [Required]
-        public string ShippingAddress { get; set; } = string.Empty;
+        // Opción A: usar dirección guardada
+        public Guid? AddressId { get; set; }
+
+        // Opción B: escribir dirección nueva al momento
+        public string? Street { get; set; }
+        public string? Interior { get; set; }
+        public string? City { get; set; }
+        public string? State { get; set; }
+        public string? ZipCode { get; set; }
+        public string? Country { get; set; }
+        public string? Phone { get; set; }
+
+        // Guardar como nueva dirección si es nueva
+        public bool SaveAddress { get; set; } = false;
+        public string? AddressAlias { get; set; }
     }
 
     // ── Response ─────────────────────────────────────────────────
@@ -29,7 +42,18 @@ namespace NexWearAPI.DTOs
         public string OrderNumber { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public decimal Total { get; set; }
-        public string ShippingAddress { get; set; } = string.Empty;
+        // Dirección como campos separados
+        public string Street { get; set; } = string.Empty;
+        public string? Interior { get; set; }
+        public string City { get; set; } = string.Empty;
+        public string State { get; set; } = string.Empty;
+        public string ZipCode { get; set; } = string.Empty;
+        public string Country { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+
+        // Dirección formateada para mostrar fácil en el front
+        public string FullAddress =>
+            $"{Street}{(Interior != null ? $", {Interior}" : "")}, {City}, {State} {ZipCode}, {Country}";
         public DateTime CreatedAt { get; set; }
         public IEnumerable<OrderItemResponseDto> Items { get; set; } = new List<OrderItemResponseDto>();
     }

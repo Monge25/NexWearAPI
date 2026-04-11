@@ -15,6 +15,7 @@ namespace NexWearAPI.Data
         public DbSet<CartItem> CartItems { get; set; }
         public DbSet<Review> Reviews { get; set; }
         public DbSet<ProductVariant> ProductVariants { get; set; }
+        public DbSet<Address> Addresses { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -144,6 +145,16 @@ namespace NexWearAPI.Data
 
             modelBuilder.Entity<ProductVariant>()
                 .HasOne(v => v.Product);    // Índice para cargar variantes rápido
+
+            // ── Addresses ─────────────────────────────────────────────────
+            modelBuilder.Entity<Address>()
+                .HasOne(a => a.User)
+                .WithMany(u => u.Addresses)
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Address>()
+                .HasIndex(a => a.UserId);
         }
     }
 }

@@ -9,7 +9,7 @@ namespace NexWearAPI.DTOs
         public string? Color { get; set; }
 
         [MaxLength(7)]
-        public string? ColorHex { get; set; }   // "#FF0000"
+        public string? ColorHex { get; set; }
 
         [MaxLength(20)]
         public string? Size { get; set; }
