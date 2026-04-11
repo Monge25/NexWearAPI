@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using NexWearAPI.Models;
+using System.Collections;
 
 namespace NexWearAPI.Data
 {
@@ -106,8 +107,15 @@ namespace NexWearAPI.Data
 
             // ── Reviews ──────────────────────────────────────────
             modelBuilder.Entity<Review>()
+                .HasOne(r => r.Order)
+                .WithMany()
+                .HasForeignKey(r => r.OrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Un usuario solo puede reseñar un producto una vez
+            modelBuilder.Entity<Review>()
                 .HasIndex(r => new { r.UserId, r.ProductId })
-                .IsUnique();    // Un usuario solo puede reseñar un producto una vez
+                .IsUnique();
 
             modelBuilder.Entity<Review>()
                 .HasOne(r => r.User)
@@ -123,6 +131,11 @@ namespace NexWearAPI.Data
 
             modelBuilder.Entity<Review>()
                 .HasIndex(r => r.ProductId);
+
+            // PhotoUrls como array de PostgreSQL
+            modelBuilder.Entity<Review>()
+                .Property(r => r.PhotoUrls)
+                .HasColumnType("text[]");
 
             // ── ProductVariants ──────────────────────────────────────────
             modelBuilder.Entity<ProductVariant>()
