@@ -14,6 +14,9 @@ namespace NexWearAPI.Services
         Task<AuthResponseDto?> RegisterAsync(RegisterRequestDto dto);
         Task<AuthResponseDto?> RegisterAdminAsync(RegisterRequestDto dto);
         Task<AuthResponseDto?> LoginAsync(LoginRequestDto dto);
+        Task ForgotPasswordAsync(ForgotPasswordDto dto);
+        Task<bool> VerifyResetCodeAsync(VerifyResetCodeDto dto);
+        Task<bool> ResetPasswordAsync(ResetPasswordDto dto);
     }
 
     // ── Implementación ───────────────────────────────────────────
@@ -21,16 +24,18 @@ namespace NexWearAPI.Services
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
+        private readonly IEmailService _emailService;
 
         // A07 - OWASP: Límite de intentos fallidos de login por email
         private static readonly Dictionary<string, (int Attempts, DateTime LockUntil)> _loginAttempts = new();
         private const int MaxAttempts = 5;
         private const int LockMinutes = 15;
 
-        public AuthService(AppDbContext context, IConfiguration config)
+        public AuthService(AppDbContext context, IConfiguration config, IEmailService emailService)
         {
             _context = context;
             _config = config;
+            _emailService = emailService;
         }
 
         // ── Registro ─────────────────────────────────────────────
@@ -113,6 +118,93 @@ namespace NexWearAPI.Services
             ResetAttempts(email);
 
             return BuildAuthResponse(user!);
+        }
+
+        // ── Solicitar código ──────────────────────────────────────────
+        public async Task ForgotPasswordAsync(ForgotPasswordDto dto)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == dto.Email.ToLower().Trim());
+
+            // A07 - Siempre responder igual aunque el email no exista
+            // para no revelar si el usuario está registrado
+            if (user is null) return;
+
+            // Invalidar códigos anteriores del mismo usuario
+            var oldCodes = await _context.PasswordResetCodes
+                .Where(c => c.UserId == user.Id && !c.IsUsed)
+                .ToListAsync();
+
+            oldCodes.ForEach(c => c.IsUsed = true);
+
+            // Eliminar códigos
+            _context.PasswordResetCodes.RemoveRange(oldCodes);
+
+            // Y también eliminar los expirados de cualquier usuario
+            var expired = await _context.PasswordResetCodes
+                .Where(c => c.ExpiresAt < DateTime.UtcNow)
+                .ToListAsync();
+            _context.PasswordResetCodes.RemoveRange(expired);
+
+            // Generar código de 6 dígitos
+            var code = new Random().Next(100000, 999999).ToString();
+
+            _context.PasswordResetCodes.Add(new PasswordResetCode
+            {
+                UserId = user.Id,
+                Code = code,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+            });
+
+            await _context.SaveChangesAsync();
+
+            // Enviar email
+            await _emailService.SendPasswordResetCodeAsync(user.Email, user.FirstName, code);
+        }
+
+        // ── Verificar código ──────────────────────────────────────────
+        public async Task<bool> VerifyResetCodeAsync(VerifyResetCodeDto dto)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == dto.Email.ToLower().Trim());
+
+            if (user is null) return false;
+
+            var resetCode = await _context.PasswordResetCodes
+                .FirstOrDefaultAsync(c =>
+                    c.UserId == user.Id &&
+                    c.Code == dto.Code &&
+                    !c.IsUsed &&
+                    c.ExpiresAt > DateTime.UtcNow);
+
+            return resetCode is not null;
+        }
+
+        // ── Resetear contraseña ───────────────────────────────────────
+        public async Task<bool> ResetPasswordAsync(ResetPasswordDto dto)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == dto.Email.ToLower().Trim());
+
+            if (user is null) return false;
+
+            var resetCode = await _context.PasswordResetCodes
+                .FirstOrDefaultAsync(c =>
+                    c.UserId == user.Id &&
+                    c.Code == dto.Code &&
+                    !c.IsUsed &&
+                    c.ExpiresAt > DateTime.UtcNow);
+
+            if (resetCode is null) return false;
+
+            // A02 - Hashear nueva contraseña con bcrypt
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword, workFactor: 12);
+
+            // Invalidar el código para que no se pueda usar dos veces
+            resetCode.IsUsed = true;
+
+            await _context.SaveChangesAsync();
+            return true;
         }
 
         // ── Generar JWT ───────────────────────────────────────────

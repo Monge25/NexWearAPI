@@ -7,6 +7,7 @@ using NexWearAPI.Services;
 using System.Text;
 using Microsoft.OpenApi.Models;
 using NexWearAPI.Filters;
+using Resend;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +44,13 @@ builder.Services.AddSwaggerGen(options =>
 
     // Soporte para subida de archivos
     options.OperationFilter<FileUploadOperationFilter>();
+});
+
+// Resend
+builder.Services.AddHttpClient<IResend, ResendClient>();
+builder.Services.Configure<ResendClientOptions>(options =>
+{
+    options.ApiToken = builder.Configuration["Resend:ApiKey"]!;
 });
 
 // ── Entity Framework + PostgreSQL ────────────────────────────
@@ -92,6 +100,8 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IMercadoPagoService, MercadoPagoService>();
+builder.Services.AddScoped<IAddressService, AddressService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
 
