@@ -24,43 +24,19 @@ namespace NexWearAPI.Controllers
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
                 ?? User.FindFirstValue("sub")!);
 
-        // ── PASO 1: Frontend llama esto ANTES de abrir el popup de PayPal ─────────
+        // ── Checkout con Mercado Pago ─────────────────────────────────────────────
 
         /// <summary>
-        /// Crea una orden en PayPal y retorna el paypalOrderId.
-        /// El frontend usa ese ID para abrir el popup de pago.
+        /// Procesa el pago y registra la orden.
+        /// El frontend manda el token de tarjeta generado por MP.js y la dirección.
         /// </summary>
-        [HttpPost("paypal/create")]
-        public async Task<IActionResult> CreatePayPalOrder()
-        {
-            try
-            {
-                var result = await _orderService.CreatePayPalOrderAsync(GetUserId());
-                return Ok(result);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creando orden PayPal");
-                return StatusCode(500, new { message = "Error al iniciar el pago. Intenta de nuevo." });
-            }
-        }
-
-        // ── PASO 2: Frontend llama esto DESPUÉS de que el usuario aprobó en PayPal ─
-
-        /// <summary>
-        /// Captura el pago (cobra), descuenta stock y registra la orden en BD.
-        /// </summary>
-        [HttpPost("paypal/capture")]
-        public async Task<IActionResult> CapturePayPalOrder([FromBody] CaptureCheckoutDto dto)
+        [HttpPost("checkout")]
+        public async Task<IActionResult> Checkout([FromBody] MpCheckoutDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             try
             {
-                var order = await _orderService.CaptureAndCheckoutAsync(GetUserId(), dto);
+                var order = await _orderService.CheckoutAsync(GetUserId(), dto);
                 return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
             }
             catch (InvalidOperationException ex)
@@ -69,7 +45,7 @@ namespace NexWearAPI.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error capturando pago PayPal");
+                _logger.LogError(ex, "Error en checkout MP");
                 return StatusCode(500, new { message = "Error al procesar el pago. Intenta de nuevo." });
             }
         }

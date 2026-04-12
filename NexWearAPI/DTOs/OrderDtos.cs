@@ -2,24 +2,17 @@
 
 namespace NexWearAPI.DTOs
 {
-    // ── Request: capturar pago (frontend → backend tras aprobación del usuario) ──
-    public class CaptureCheckoutDto
+    // ── Request: datos del pago desde el frontend ─────────────────────────────────
+    public class MpCheckoutDto
     {
         [Required]
-        public string PaypalOrderId { get; set; } = string.Empty;
+        public string Token { get; set; } = string.Empty; // Token de tarjeta generado por MP.js
 
         [Required]
         public string ShippingAddress { get; set; } = string.Empty;
     }
 
-    // ── Response: lo que el backend retorna al frontend en el paso 1 ─────────────
-    public class CreatePayPalOrderResponseDto
-    {
-        public string PaypalOrderId { get; set; } = string.Empty;
-        public decimal Total { get; set; }
-    }
-
-    // ── Response: detalle de un item dentro de la orden ──────────────────────────
+    // ── Response: detalle de un item dentro de la orden ───────────────────────────
     public class OrderItemResponseDto
     {
         public Guid Id { get; set; }

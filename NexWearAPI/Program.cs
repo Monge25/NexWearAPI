@@ -91,8 +91,7 @@ builder.Services.AddScoped<IProductVariantService, ProductVariantService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
-builder.Services.AddHttpClient();          // ← necesario para IHttpClientFactory
-builder.Services.AddScoped<IPayPalService, PayPalService>();  // ← nuevo servicio
+builder.Services.AddScoped<IMercadoPagoService, MercadoPagoService>();
 
 var app = builder.Build();
 

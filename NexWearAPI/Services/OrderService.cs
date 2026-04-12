@@ -7,12 +7,7 @@ namespace NexWearAPI.Services
 {
     public interface IOrderService
     {
-        /// <summary>Paso 1 — Crea la orden en PayPal y retorna el ID al frontend.</summary>
-        Task<CreatePayPalOrderResponseDto> CreatePayPalOrderAsync(Guid userId);
-
-        /// <summary>Paso 2 — Captura el pago y guarda la orden en BD.</summary>
-        Task<OrderResponseDto> CaptureAndCheckoutAsync(Guid userId, CaptureCheckoutDto dto);
-
+        Task<OrderResponseDto> CheckoutAsync(Guid userId, MpCheckoutDto dto);
         Task<IEnumerable<OrderResponseDto>> GetMyOrdersAsync(Guid userId);
         Task<OrderResponseDto?> GetByIdAsync(Guid userId, Guid orderId);
     }
@@ -20,58 +15,43 @@ namespace NexWearAPI.Services
     public class OrderService : IOrderService
     {
         private readonly AppDbContext _context;
-        private readonly IPayPalService _paypal;
+        private readonly IMercadoPagoService _mercadoPago;
         private readonly ILogger<OrderService> _logger;
 
         public OrderService(
             AppDbContext context,
-            IPayPalService paypal,
+            IMercadoPagoService mercadoPago,
             ILogger<OrderService> logger)
         {
             _context = context;
-            _paypal = paypal;
+            _mercadoPago = mercadoPago;
             _logger = logger;
         }
 
-        // ── Paso 1: Crear orden en PayPal ─────────────────────────────────────────
+        // ── Checkout: crear pago y guardar orden ──────────────────────────────────
 
-        public async Task<CreatePayPalOrderResponseDto> CreatePayPalOrderAsync(Guid userId)
+        public async Task<OrderResponseDto> CheckoutAsync(Guid userId, MpCheckoutDto dto)
         {
             var cartItems = await GetAndValidateCart(userId);
             var orderItems = BuildOrderItems(cartItems);
             var total = orderItems.Sum(i => i.UnitPrice * i.Quantity);
 
-            var paypalOrderId = await _paypal.CreateOrderAsync(total, "MXN");
+            // Obtener email del usuario
+            var user = await _context.Users.FindAsync(userId)
+                ?? throw new InvalidOperationException("Usuario no encontrado.");
 
-            return new CreatePayPalOrderResponseDto
-            {
-                PaypalOrderId = paypalOrderId,
-                Total = total
-            };
-        }
+            // Crear pago en Mercado Pago
+            var paymentId = await _mercadoPago.CreatePaymentAsync(
+                total,
+                "Compra NexWear",
+                dto.Token,
+                user.Email);
 
-        // ── Paso 2: Capturar pago y guardar en BD ─────────────────────────────────
+            // Verificar que el pago fue aprobado
+            var payment = await _mercadoPago.GetPaymentAsync(long.Parse(paymentId));
 
-        public async Task<OrderResponseDto> CaptureAndCheckoutAsync(
-            Guid userId, CaptureCheckoutDto dto)
-        {
-            // Validar carrito de nuevo (puede haber cambiado)
-            var cartItems = await GetAndValidateCart(userId);
-            var orderItems = BuildOrderItems(cartItems);
-            var total = orderItems.Sum(i => i.UnitPrice * i.Quantity);
-
-            // Evitar órdenes duplicadas con el mismo PaypalOrderId
-            var duplicate = await _context.Orders
-                .AnyAsync(o => o.PaypalOrderId == dto.PaypalOrderId);
-            if (duplicate)
-                throw new InvalidOperationException("Esta orden ya fue procesada.");
-
-            // CAPTURA REAL — aquí se cobra el dinero en PayPal
-            var capture = await _paypal.CaptureOrderAsync(dto.PaypalOrderId);
-
-            if (!capture.Success)
-                throw new InvalidOperationException(
-                    "El pago no pudo completarse. Por favor intenta de nuevo.");
+            if (!payment.Success)
+                throw new InvalidOperationException("El pago no fue aprobado. Intenta de nuevo.");
 
             // Guardar orden en BD
             var order = new Order
@@ -80,18 +60,16 @@ namespace NexWearAPI.Services
                 Status = OrderStatus.Paid,
                 Total = total,
                 ShippingAddress = dto.ShippingAddress,
-                PaymentMethod = "paypal",
-                PaypalOrderId = dto.PaypalOrderId,
-                PaypalCaptureId = capture.CaptureId,
+                PaymentMethod = "mercadopago",
+                PaypalOrderId = paymentId,
                 PaidAt = DateTime.UtcNow,
                 OrderItems = orderItems
             };
 
             await SaveOrder(order, cartItems);
 
-            _logger.LogInformation(
-                "Orden {OrderId} pagada. CaptureId: {CaptureId}",
-                order.Id, capture.CaptureId);
+            _logger.LogInformation("Orden {OrderId} pagada con MP. PaymentId: {PaymentId}",
+                order.Id, paymentId);
 
             return MapToDto(order);
         }
