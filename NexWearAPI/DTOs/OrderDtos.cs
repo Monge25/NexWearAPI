@@ -2,29 +2,24 @@
 
 namespace NexWearAPI.DTOs
 {
-    public class CheckoutDto
-    {
-        [Required]
-        public string ShippingAddress { get; set; } = string.Empty;
-
-        [Required]
-        public string PaymentMethod { get; set; } = "paypal";
-
-        public string? PaypalOrderId { get; set; }
-    }
-
-    public class PaypalCheckoutDto
+    // ── Request: capturar pago (frontend → backend tras aprobación del usuario) ──
+    public class CaptureCheckoutDto
     {
         [Required]
         public string PaypalOrderId { get; set; } = string.Empty;
 
         [Required]
-        public string PaymentMethod { get; set; } = "card";
-
-        [Required]
         public string ShippingAddress { get; set; } = string.Empty;
     }
 
+    // ── Response: lo que el backend retorna al frontend en el paso 1 ─────────────
+    public class CreatePayPalOrderResponseDto
+    {
+        public string PaypalOrderId { get; set; } = string.Empty;
+        public decimal Total { get; set; }
+    }
+
+    // ── Response: detalle de un item dentro de la orden ──────────────────────────
     public class OrderItemResponseDto
     {
         public Guid Id { get; set; }
@@ -39,6 +34,7 @@ namespace NexWearAPI.DTOs
         public decimal Total { get; set; }
     }
 
+    // ── Response: orden completa ──────────────────────────────────────────────────
     public class OrderResponseDto
     {
         public Guid Id { get; set; }

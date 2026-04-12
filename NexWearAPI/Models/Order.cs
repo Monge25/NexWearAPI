@@ -28,10 +28,14 @@ namespace NexWearAPI.Models
         public string ShippingAddress { get; set; } = string.Empty;
 
         [MaxLength(20)]
-        public string PaymentMethod { get; set; } = "card";
+        public string PaymentMethod { get; set; } = "paypal";
 
         [MaxLength(100)]
         public string? PaypalOrderId { get; set; }
+
+        // ← NUEVO: ID de la captura, necesario para reembolsos
+        [MaxLength(100)]
+        public string? PaypalCaptureId { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? PaidAt { get; set; }

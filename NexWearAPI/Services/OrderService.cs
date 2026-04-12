@@ -7,8 +7,12 @@ namespace NexWearAPI.Services
 {
     public interface IOrderService
     {
-        Task<OrderResponseDto> CheckoutAsync(Guid userId, CheckoutDto dto);
-        Task<OrderResponseDto> CheckoutWithPaypalAsync(Guid userId, PaypalCheckoutDto dto);
+        /// <summary>Paso 1 — Crea la orden en PayPal y retorna el ID al frontend.</summary>
+        Task<CreatePayPalOrderResponseDto> CreatePayPalOrderAsync(Guid userId);
+
+        /// <summary>Paso 2 — Captura el pago y guarda la orden en BD.</summary>
+        Task<OrderResponseDto> CaptureAndCheckoutAsync(Guid userId, CaptureCheckoutDto dto);
+
         Task<IEnumerable<OrderResponseDto>> GetMyOrdersAsync(Guid userId);
         Task<OrderResponseDto?> GetByIdAsync(Guid userId, Guid orderId);
     }
@@ -17,68 +21,82 @@ namespace NexWearAPI.Services
     {
         private readonly AppDbContext _context;
         private readonly IPayPalService _paypal;
+        private readonly ILogger<OrderService> _logger;
 
-        public OrderService(AppDbContext context, IPayPalService paypal)
+        public OrderService(
+            AppDbContext context,
+            IPayPalService paypal,
+            ILogger<OrderService> logger)
         {
             _context = context;
             _paypal = paypal;
+            _logger = logger;
         }
 
-        // ── Checkout legacy (sin PayPal) ──────────────────────
-        public async Task<OrderResponseDto> CheckoutAsync(Guid userId, CheckoutDto dto)
+        // ── Paso 1: Crear orden en PayPal ─────────────────────────────────────────
+
+        public async Task<CreatePayPalOrderResponseDto> CreatePayPalOrderAsync(Guid userId)
         {
             var cartItems = await GetAndValidateCart(userId);
             var orderItems = BuildOrderItems(cartItems);
             var total = orderItems.Sum(i => i.UnitPrice * i.Quantity);
 
-            var order = new Order
+            var paypalOrderId = await _paypal.CreateOrderAsync(total, "MXN");
+
+            return new CreatePayPalOrderResponseDto
             {
-                UserId = userId,
-                Status = OrderStatus.Pending,
-                Total = total,
-                ShippingAddress = dto.ShippingAddress,
-                PaymentMethod = dto.PaymentMethod ?? "card",
-                OrderItems = orderItems
+                PaypalOrderId = paypalOrderId,
+                Total = total
             };
-
-            await SaveOrder(order, cartItems);
-            return MapToDto(order);
         }
 
-        // ── Checkout con PayPal ───────────────────────────────
-        public async Task<OrderResponseDto> CheckoutWithPaypalAsync(Guid userId, PaypalCheckoutDto dto)
-        {
-            // Validar método de pago
-            if (dto.PaymentMethod != "card" && dto.PaymentMethod != "paypal")
-                throw new InvalidOperationException("Método de pago inválido.");
+        // ── Paso 2: Capturar pago y guardar en BD ─────────────────────────────────
 
-            // 1. Verificar carrito
+        public async Task<OrderResponseDto> CaptureAndCheckoutAsync(
+            Guid userId, CaptureCheckoutDto dto)
+        {
+            // Validar carrito de nuevo (puede haber cambiado)
             var cartItems = await GetAndValidateCart(userId);
             var orderItems = BuildOrderItems(cartItems);
             var total = orderItems.Sum(i => i.UnitPrice * i.Quantity);
 
-            // 2. Verificar pago con PayPal desde el servidor
-            var isValid = await _paypal.VerifyOrderAsync(dto.PaypalOrderId, total);
-            if (!isValid)
-                throw new InvalidOperationException(
-                    "No se pudo verificar el pago. Por favor intenta de nuevo.");
+            // Evitar órdenes duplicadas con el mismo PaypalOrderId
+            var duplicate = await _context.Orders
+                .AnyAsync(o => o.PaypalOrderId == dto.PaypalOrderId);
+            if (duplicate)
+                throw new InvalidOperationException("Esta orden ya fue procesada.");
 
-            // 3. Crear la orden como Pagada
+            // CAPTURA REAL — aquí se cobra el dinero en PayPal
+            var capture = await _paypal.CaptureOrderAsync(dto.PaypalOrderId);
+
+            if (!capture.Success)
+                throw new InvalidOperationException(
+                    "El pago no pudo completarse. Por favor intenta de nuevo.");
+
+            // Guardar orden en BD
             var order = new Order
             {
                 UserId = userId,
                 Status = OrderStatus.Paid,
                 Total = total,
                 ShippingAddress = dto.ShippingAddress,
-                PaymentMethod = dto.PaymentMethod,
+                PaymentMethod = "paypal",
                 PaypalOrderId = dto.PaypalOrderId,
+                PaypalCaptureId = capture.CaptureId,
                 PaidAt = DateTime.UtcNow,
                 OrderItems = orderItems
             };
 
             await SaveOrder(order, cartItems);
+
+            _logger.LogInformation(
+                "Orden {OrderId} pagada. CaptureId: {CaptureId}",
+                order.Id, capture.CaptureId);
+
             return MapToDto(order);
         }
+
+        // ── Consultas ─────────────────────────────────────────────────────────────
 
         public async Task<IEnumerable<OrderResponseDto>> GetMyOrdersAsync(Guid userId)
         {
@@ -102,7 +120,8 @@ namespace NexWearAPI.Services
             return order is null ? null : MapToDto(order);
         }
 
-        // ── Helpers ───────────────────────────────────────────
+        // ── Helpers ───────────────────────────────────────────────────────────────
+
         private async Task<List<CartItem>> GetAndValidateCart(Guid userId)
         {
             var cartItems = await _context.CartItems
@@ -122,7 +141,8 @@ namespace NexWearAPI.Services
 
                 if (item.Variant.Stock < item.Quantity)
                     throw new InvalidOperationException(
-                        $"Stock insuficiente para '{item.Product.Name} - {item.Variant.Size}'. Disponible: {item.Variant.Stock}");
+                        $"Stock insuficiente para '{item.Product.Name} - {item.Variant.Size}'. " +
+                        $"Disponible: {item.Variant.Stock}");
             }
 
             return cartItems;
