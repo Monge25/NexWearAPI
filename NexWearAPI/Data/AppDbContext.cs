@@ -60,6 +60,24 @@ namespace NexWearAPI.Data
             modelBuilder.Entity<Order>()
                 .HasIndex(o => o.UserId);
 
+            modelBuilder.Entity<Order>()
+                .Property(o => o.PaymentMethod)
+                .HasMaxLength(20)
+                .HasDefaultValue("paypal");
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.PaypalOrderId)
+                .HasMaxLength(50);   
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.PaymentMethod)
+                .HasMaxLength(20)
+                .HasDefaultValue("card");
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.PaypalOrderId)
+                .HasMaxLength(100);        
+
             // ── OrderItems ───────────────────────────────────────
             modelBuilder.Entity<OrderItem>()
                 .Property(oi => oi.UnitPrice)
