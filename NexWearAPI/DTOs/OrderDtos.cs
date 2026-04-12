@@ -4,24 +4,27 @@ namespace NexWearAPI.DTOs
 {
     public class CheckoutDto
     {
-        // Opción A: usar dirección guardada
-        public Guid? AddressId { get; set; }
+        [Required]
+        public string ShippingAddress { get; set; } = string.Empty;
 
-        // Opción B: escribir dirección nueva al momento
-        public string? Street { get; set; }
-        public string? Interior { get; set; }
-        public string? City { get; set; }
-        public string? State { get; set; }
-        public string? ZipCode { get; set; }
-        public string? Country { get; set; }
-        public string? Phone { get; set; }
+        [Required]
+        public string PaymentMethod { get; set; } = "paypal";
 
-        // Guardar como nueva dirección si es nueva
-        public bool SaveAddress { get; set; } = false;
-        public string? AddressAlias { get; set; }
+        public string? PaypalOrderId { get; set; }
     }
 
-    // ── Response ─────────────────────────────────────────────────
+    public class PaypalCheckoutDto
+    {
+        [Required]
+        public string PaypalOrderId { get; set; } = string.Empty;
+
+        [Required]
+        public string PaymentMethod { get; set; } = "card";
+
+        [Required]
+        public string ShippingAddress { get; set; } = string.Empty;
+    }
+
     public class OrderItemResponseDto
     {
         public Guid Id { get; set; }
@@ -42,19 +45,11 @@ namespace NexWearAPI.DTOs
         public string OrderNumber { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public decimal Total { get; set; }
-        // Dirección como campos separados
-        public string Street { get; set; } = string.Empty;
-        public string? Interior { get; set; }
-        public string City { get; set; } = string.Empty;
-        public string State { get; set; } = string.Empty;
-        public string ZipCode { get; set; } = string.Empty;
-        public string Country { get; set; } = string.Empty;
-        public string? Phone { get; set; }
-
-        // Dirección formateada para mostrar fácil en el front
-        public string FullAddress =>
-            $"{Street}{(Interior != null ? $", {Interior}" : "")}, {City}, {State} {ZipCode}, {Country}";
+        public string ShippingAddress { get; set; } = string.Empty;
+        public string PaymentMethod { get; set; } = string.Empty;
+        public string? PaypalOrderId { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? PaidAt { get; set; }
         public IEnumerable<OrderItemResponseDto> Items { get; set; } = new List<OrderItemResponseDto>();
     }
 }

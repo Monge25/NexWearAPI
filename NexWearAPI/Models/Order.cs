@@ -24,36 +24,17 @@ namespace NexWearAPI.Models
         [Required]
         public decimal Total { get; set; }
 
-        // ── Snapshot de la dirección al momento de comprar ────────
-        // Nunca como FK — si el usuario borra su dirección,
-        // la orden sigue teniendo el dato completo
         [Required]
-        [MaxLength(255)]
-        public string Street { get; set; } = string.Empty;
-
-        [MaxLength(100)]
-        public string? Interior { get; set; }
-
-        [Required]
-        [MaxLength(100)]
-        public string City { get; set; } = string.Empty;
-
-        [Required]
-        [MaxLength(100)]
-        public string State { get; set; } = string.Empty;
-
-        [Required]
-        [MaxLength(10)]
-        public string ZipCode { get; set; } = string.Empty;
-
-        [Required]
-        [MaxLength(100)]
-        public string Country { get; set; } = "México";
+        public string ShippingAddress { get; set; } = string.Empty;
 
         [MaxLength(20)]
-        public string? Phone { get; set; }
+        public string PaymentMethod { get; set; } = "card";
+
+        [MaxLength(100)]
+        public string? PaypalOrderId { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? PaidAt { get; set; }
 
         // Navegación
         public User User { get; set; } = null!;

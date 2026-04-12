@@ -59,6 +59,24 @@ namespace NexWearAPI.Data
             modelBuilder.Entity<Order>()
                 .HasIndex(o => o.UserId);
 
+            modelBuilder.Entity<Order>()
+                .Property(o => o.PaymentMethod)
+                .HasMaxLength(20)
+                .HasDefaultValue("paypal");
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.PaypalOrderId)
+                .HasMaxLength(50);   
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.PaymentMethod)
+                .HasMaxLength(20)
+                .HasDefaultValue("card");
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.PaypalOrderId)
+                .HasMaxLength(100);        
+
             // ── OrderItems ───────────────────────────────────────
             modelBuilder.Entity<OrderItem>()
                 .Property(oi => oi.UnitPrice)
@@ -145,16 +163,6 @@ namespace NexWearAPI.Data
 
             modelBuilder.Entity<ProductVariant>()
                 .HasOne(v => v.Product);    // Índice para cargar variantes rápido
-
-            // ── Addresses ─────────────────────────────────────────────────
-            modelBuilder.Entity<Address>()
-                .HasOne(a => a.User)
-                .WithMany(u => u.Addresses)
-                .HasForeignKey(a => a.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<Address>()
-                .HasIndex(a => a.UserId);
         }
     }
 }
