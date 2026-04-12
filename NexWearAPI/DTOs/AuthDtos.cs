@@ -43,4 +43,40 @@ namespace NexWearAPI.DTOs
         public string Role { get; set; } = string.Empty;
         public DateTime ExpiresAt { get; set; }
     }
+
+    // ── Request: Solicitar código ─────────────────────────────────
+    public class ForgotPasswordDto
+    {
+        [Required(ErrorMessage = "El email es obligatorio")]
+        [EmailAddress(ErrorMessage = "Email inválido")]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    // ── Request: Verificar código ─────────────────────────────────
+    public class VerifyResetCodeDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "El código debe tener 6 dígitos")]
+        public string Code { get; set; } = string.Empty;
+    }
+
+    // ── Request: Resetear contraseña ──────────────────────────────
+    public class ResetPasswordDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(6, MinimumLength = 6)]
+        public string Code { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(8, ErrorMessage = "La contraseña debe tener mínimo 8 caracteres")]
+        public string NewPassword { get; set; } = string.Empty;
+    }
 }

@@ -85,5 +85,48 @@ namespace NexWearAPI.Controllers
 
             return Ok(result);
         }
+
+        /// <summary>Solicitar código de recuperación</summary>
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            await _authService.ForgotPasswordAsync(dto);
+
+            // A07 - Siempre responder igual para no revelar si el email existe
+            return Ok(new { message = "Si el email está registrado, recibirás un código en breve." });
+        }
+
+        /// <summary>Verificar si el código es válido</summary>
+        [HttpPost("verify-reset-code")]
+        public async Task<IActionResult> VerifyResetCode([FromBody] VerifyResetCodeDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var isValid = await _authService.VerifyResetCodeAsync(dto);
+
+            if (!isValid)
+                return BadRequest(new { message = "Código inválido o expirado." });
+
+            return Ok(new { message = "Código válido." });
+        }
+
+        /// <summary>Resetear contraseña con el código</summary>
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var result = await _authService.ResetPasswordAsync(dto);
+
+            if (!result)
+                return BadRequest(new { message = "Código inválido o expirado." });
+
+            _logger.LogInformation("Contraseña restablecida para: {Email} a las {Time}",
+                dto.Email, DateTime.UtcNow);
+
+            return Ok(new { message = "Contraseña restablecida correctamente." });
+        }
     }
 }
