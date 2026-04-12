@@ -16,6 +16,7 @@ namespace NexWearAPI.Data
         public DbSet<Review> Reviews { get; set; }
         public DbSet<ProductVariant> ProductVariants { get; set; }
         public DbSet<Address> Addresses { get; set; }
+        public DbSet<PasswordResetCode> PasswordResetCodes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -155,6 +156,16 @@ namespace NexWearAPI.Data
 
             modelBuilder.Entity<Address>()
                 .HasIndex(a => a.UserId);
+
+            // ── PasswordResetCodes ────────────────────────────────────────
+            modelBuilder.Entity<PasswordResetCode>()
+                .HasOne(p => p.User)
+                .WithMany()
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PasswordResetCode>()
+                .HasIndex(p => p.UserId);
         }
     }
 }
