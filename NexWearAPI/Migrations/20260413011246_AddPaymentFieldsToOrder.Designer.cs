@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NexWearAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260412012637_Init2")]
-    partial class Init2
+    [Migration("20260413011246_AddPaymentFieldsToOrder")]
+    partial class AddPaymentFieldsToOrder
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -125,8 +125,26 @@ namespace NexWearAPI.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Interior")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("MPOrderId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
@@ -136,19 +154,25 @@ namespace NexWearAPI.Migrations
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasDefaultValue("card");
+                        .HasDefaultValue("mercadopago");
 
-                    b.Property<string>("PaypalOrderId")
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ShippingAddress")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("Street")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<decimal>("Total")
                         .HasPrecision(10, 2)
@@ -156,6 +180,11 @@ namespace NexWearAPI.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ZipCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.HasKey("Id");
 
@@ -208,6 +237,36 @@ namespace NexWearAPI.Migrations
                     b.HasIndex("VariantId");
 
                     b.ToTable("OrderItems");
+                });
+
+            modelBuilder.Entity("NexWearAPI.Models.PasswordResetCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetCodes");
                 });
 
             modelBuilder.Entity("NexWearAPI.Models.Product", b =>
@@ -472,6 +531,17 @@ namespace NexWearAPI.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("Variant");
+                });
+
+            modelBuilder.Entity("NexWearAPI.Models.PasswordResetCode", b =>
+                {
+                    b.HasOne("NexWearAPI.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("NexWearAPI.Models.ProductVariant", b =>

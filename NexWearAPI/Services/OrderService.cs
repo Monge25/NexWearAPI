@@ -36,39 +36,97 @@ namespace NexWearAPI.Services
             var orderItems = BuildOrderItems(cartItems);
             var total = orderItems.Sum(i => i.UnitPrice * i.Quantity);
 
-            // Obtener email del usuario
+            // Obtener usuario
             var user = await _context.Users.FindAsync(userId)
                 ?? throw new InvalidOperationException("Usuario no encontrado.");
 
-            // Crear pago en Mercado Pago
+            // ── Resolver dirección ────────────────────────────────
+            string street, city, state, zipCode, country;
+            string? interior, phone;
+
+            if (dto.AddressId.HasValue)
+            {
+                // Usar dirección guardada
+                var saved = await _context.Addresses
+                    .FirstOrDefaultAsync(a => a.Id == dto.AddressId && a.UserId == userId);
+
+                if (saved is null)
+                    throw new InvalidOperationException("Dirección no encontrada.");
+
+                street = saved.Street;
+                interior = saved.Interior;
+                city = saved.City;
+                state = saved.State;
+                zipCode = saved.ZipCode;
+                country = saved.Country;
+                phone = saved.Phone;
+            }
+            else
+            {
+                // Usar dirección escrita en el checkout
+                if (string.IsNullOrWhiteSpace(dto.Street) || string.IsNullOrWhiteSpace(dto.City))
+                    throw new InvalidOperationException("Se requiere una dirección de envío.");
+
+                street = dto.Street!;
+                interior = dto.Interior;
+                city = dto.City!;
+                state = dto.State ?? "";
+                zipCode = dto.ZipCode ?? "";
+                country = dto.Country ?? "México";
+                phone = dto.Phone;
+
+                // Guardar como nueva dirección si el usuario lo pidió
+                if (dto.SaveAddress && !string.IsNullOrWhiteSpace(dto.AddressAlias))
+                {
+                    _context.Addresses.Add(new Address
+                    {
+                        UserId = userId,
+                        Alias = dto.AddressAlias,
+                        Street = street,
+                        Interior = interior,
+                        City = city,
+                        State = state,
+                        ZipCode = zipCode,
+                        Country = country,
+                        Phone = phone,
+                    });
+                }
+            }
+
+            // ── Crear pago en Mercado Pago ────────────────────────
             var paymentId = await _mercadoPago.CreatePaymentAsync(
                 total,
                 "Compra NexWear",
                 dto.Token,
                 user.Email);
 
-            // Verificar que el pago fue aprobado
             var payment = await _mercadoPago.GetPaymentAsync(long.Parse(paymentId));
 
             if (!payment.Success)
                 throw new InvalidOperationException("El pago no fue aprobado. Intenta de nuevo.");
 
-            // Guardar orden en BD
+            // ── Guardar orden con snapshot de dirección ───────────
             var order = new Order
             {
                 UserId = userId,
                 Status = OrderStatus.Paid,
                 Total = total,
-                ShippingAddress = dto.ShippingAddress,
+                Street = street,
+                Interior = interior,
+                City = city,
+                State = state,
+                ZipCode = zipCode,
+                Country = country,
+                Phone = phone,
                 PaymentMethod = "mercadopago",
-                PaypalOrderId = paymentId,
+                MPOrderId = paymentId,
                 PaidAt = DateTime.UtcNow,
-                OrderItems = orderItems
+                OrderItems = orderItems,
             };
 
             await SaveOrder(order, cartItems);
 
-            _logger.LogInformation("Orden {OrderId} pagada con MP. PaymentId: {PaymentId}",
+            _logger.LogInformation("Orden {OrderId} pagada con Mercado Pago. PaymentId: {PaymentId}",
                 order.Id, paymentId);
 
             return MapToDto(order);
@@ -162,11 +220,18 @@ namespace NexWearAPI.Services
             OrderNumber = $"ORD-{order.Id.ToString()[..8].ToUpper()}",
             Status = order.Status.ToString(),
             Total = order.Total,
-            ShippingAddress = order.ShippingAddress,
-            PaymentMethod = order.PaymentMethod,
-            PaypalOrderId = order.PaypalOrderId,
             CreatedAt = order.CreatedAt,
             PaidAt = order.PaidAt,
+
+            // ── Dirección snapshot ────────────────────────────────
+            Street = order.Street,
+            Interior = order.Interior,
+            City = order.City,
+            State = order.State,
+            ZipCode = order.ZipCode,
+            Country = order.Country,
+            Phone = order.Phone,
+
             Items = order.OrderItems.Select(i => new OrderItemResponseDto
             {
                 Id = i.Id,

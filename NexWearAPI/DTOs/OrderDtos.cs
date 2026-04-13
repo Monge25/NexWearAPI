@@ -5,11 +5,26 @@ namespace NexWearAPI.DTOs
     // ── Request: datos del pago desde el frontend ─────────────────────────────────
     public class MpCheckoutDto
     {
+        // Lo que ya tenías
         [Required]
-        public string Token { get; set; } = string.Empty; // Token de tarjeta generado por MP.js
+        public string Token { get; set; } = string.Empty;
 
-        [Required]
-        public string ShippingAddress { get; set; } = string.Empty;
+        // ── Dirección ─────────────────────────────────────────
+        // Opción A: dirección guardada
+        public Guid? AddressId { get; set; }
+
+        // Opción B: dirección nueva
+        public string? Street { get; set; }
+        public string? Interior { get; set; }
+        public string? City { get; set; }
+        public string? State { get; set; }
+        public string? ZipCode { get; set; }
+        public string? Country { get; set; }
+        public string? Phone { get; set; }
+
+        // Guardar dirección nueva para después
+        public bool SaveAddress { get; set; } = false;
+        public string? AddressAlias { get; set; }
     }
 
     // ── Response: detalle de un item dentro de la orden ───────────────────────────
@@ -34,11 +49,22 @@ namespace NexWearAPI.DTOs
         public string OrderNumber { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public decimal Total { get; set; }
-        public string ShippingAddress { get; set; } = string.Empty;
-        public string PaymentMethod { get; set; } = string.Empty;
-        public string? PaypalOrderId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? PaidAt { get; set; }
+
+        // Dirección
+        public string Street { get; set; } = string.Empty;
+        public string? Interior { get; set; }
+        public string City { get; set; } = string.Empty;
+        public string State { get; set; } = string.Empty;
+        public string ZipCode { get; set; } = string.Empty;
+        public string Country { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+
+        // Dirección formateada para mostrar en el front
+        public string FullAddress =>
+            $"{Street}{(Interior != null ? $", {Interior}" : "")}, {City}, {State} {ZipCode}, {Country}";
+
         public IEnumerable<OrderItemResponseDto> Items { get; set; } = new List<OrderItemResponseDto>();
     }
 }

@@ -6,11 +6,32 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace NexWearAPI.Migrations
 {
     /// <inheritdoc />
-    public partial class AddPasswordResetCodes : Migration
+    public partial class AddPaymentFieldsToOrder : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<string>(
+                name: "MPOrderId",
+                table: "Orders",
+                type: "character varying(100)",
+                maxLength: 100,
+                nullable: true);
+
+            migrationBuilder.AddColumn<DateTime>(
+                name: "PaidAt",
+                table: "Orders",
+                type: "timestamp with time zone",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "PaymentMethod",
+                table: "Orders",
+                type: "character varying(20)",
+                maxLength: 20,
+                nullable: false,
+                defaultValue: "mercadopago");
+
             migrationBuilder.CreateTable(
                 name: "PasswordResetCodes",
                 columns: table => new
@@ -44,6 +65,18 @@ namespace NexWearAPI.Migrations
         {
             migrationBuilder.DropTable(
                 name: "PasswordResetCodes");
+
+            migrationBuilder.DropColumn(
+                name: "MPOrderId",
+                table: "Orders");
+
+            migrationBuilder.DropColumn(
+                name: "PaidAt",
+                table: "Orders");
+
+            migrationBuilder.DropColumn(
+                name: "PaymentMethod",
+                table: "Orders");
         }
     }
 }

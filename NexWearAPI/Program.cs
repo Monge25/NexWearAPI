@@ -46,13 +46,6 @@ builder.Services.AddSwaggerGen(options =>
     options.OperationFilter<FileUploadOperationFilter>();
 });
 
-// Resend
-builder.Services.AddHttpClient<IResend, ResendClient>();
-builder.Services.Configure<ResendClientOptions>(options =>
-{
-    options.ApiToken = builder.Configuration["Resend:ApiKey"]!;
-});
-
 // ── Entity Framework + PostgreSQL ────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -102,6 +95,7 @@ builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IMercadoPagoService, MercadoPagoService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 var app = builder.Build();
 
