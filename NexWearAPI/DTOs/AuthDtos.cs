@@ -12,6 +12,9 @@ namespace NexWearAPI.DTOs
 
         [Required(ErrorMessage = "La contraseña es obligatoria")]
         [MinLength(8, ErrorMessage = "La contraseña debe tener mínimo 8 caracteres")]
+        [RegularExpression(
+            @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$",
+            ErrorMessage = "La contraseña debe incluir mayúsculas, minúsculas, un número y un carácter especial.")]
         public string Password { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "El nombre es obligatorio")]
