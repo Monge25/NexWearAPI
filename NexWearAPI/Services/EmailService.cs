@@ -1,40 +1,40 @@
-﻿using MailKit.Security;
-using MimeKit;
-using MailKit.Net.Smtp;
+﻿using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
-namespace NexWearAPI.Services
+namespace NexWearAPI.Services;
+
+public interface IEmailService
 {
-    public interface IEmailService
+    Task SendPasswordResetCodeAsync(string toEmail, string firstName, string code);
+}
+
+public class EmailService : IEmailService
+{
+    private readonly IConfiguration _config;
+    private readonly ILogger<EmailService> _logger;
+    private readonly HttpClient _httpClient;
+
+    public EmailService(IConfiguration config, ILogger<EmailService> logger, IHttpClientFactory httpClientFactory)
     {
-        Task SendPasswordResetCodeAsync(string toEmail, string firstName, string code);
+        _config = config;
+        _logger = logger;
+        _httpClient = httpClientFactory.CreateClient();
     }
 
-    public class EmailService : IEmailService
+    public async Task SendPasswordResetCodeAsync(string toEmail, string firstName, string code)
     {
-        private readonly IConfiguration _config;
-        private readonly ILogger<EmailService> _logger;
+        var apiKey = _config["Brevo:ApiKey"]!;
+        var fromEmail = _config["Brevo:FromEmail"]!;
+        var fromName = _config["Brevo:FromName"]!;
 
-        public EmailService(IConfiguration config, ILogger<EmailService> logger)
+        var body = new
         {
-            _config = config;
-            _logger = logger;
-        }
-
-        public async Task SendPasswordResetCodeAsync(string toEmail, string firstName, string code)
-        {
-            var message = new MimeMessage();
-
-            message.From.Add(new MailboxAddress(
-                _config["Email:FromName"]!,
-                _config["Email:FromEmail"]!
-            ));
-
-            message.To.Add(new MailboxAddress(firstName, toEmail));
-            message.Subject = "Código de recuperación — NexWear";
-
-            message.Body = new TextPart("html")
-            {
-                Text = $"""
+            sender = new { name = fromName, email = fromEmail },
+            to = new[] { new { email = toEmail, name = firstName } },
+            subject = "Código de recuperación — NexWear",
+            htmlContent = $"""
                 <!DOCTYPE html>
                 <html>
                 <body style="font-family: Arial, sans-serif; max-width: 480px;
@@ -71,39 +71,27 @@ namespace NexWearAPI.Services
                 </body>
                 </html>
             """
-            };
+        };
 
-            try
-            {
-                using var client = new SmtpClient();
+        var json = JsonSerializer.Serialize(body);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                await client.ConnectAsync(
-                    _config["Email:Host"]!,
-                    int.Parse(_config["Email:Port"]!),
-                    SecureSocketOptions.StartTls
-                );
+        _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Add("api-key", apiKey);
+        _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
 
-                await client.AuthenticateAsync(
-                    _config["Email:Username"]!,
-                    _config["Email:Password"]!
-                );
+        var response = await _httpClient.PostAsync(
+            "https://api.brevo.com/v3/smtp/email", content);
 
-                await client.SendAsync(message);
-                await client.DisconnectAsync(true);
+        var responseBody = await response.Content.ReadAsStringAsync();
 
-                _logger.LogInformation("Email enviado a {Email}", toEmail);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error completo: {Error} | Inner: {Inner}",
-                    ex.Message, ex.InnerException?.Message);
-                throw;
-            }
-            //catch (Exception ex)
-            //{
-            //    _logger.LogError("Error al enviar email a {Email}: {Error}", toEmail, ex.Message);
-            //    throw;
-            //}
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("Error Brevo API: {Status} - {Body}",
+                response.StatusCode, responseBody);
+            throw new InvalidOperationException($"Error al enviar email: {responseBody}");
         }
+
+        _logger.LogInformation("✅ Email enviado a {Email} via Brevo API", toEmail);
     }
 }

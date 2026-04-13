@@ -97,6 +97,8 @@ builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 
+builder.Services.AddHttpClient();
+
 var app = builder.Build();
 
 // ── Middleware ────────────────────────────────────────────────
