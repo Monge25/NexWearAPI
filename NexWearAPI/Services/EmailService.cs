@@ -26,7 +26,7 @@ namespace NexWearAPI.Services
 
             message.From.Add(new MailboxAddress(
                 _config["Email:FromName"]!,
-                _config["Email:Username"]!
+                _config["Email:FromEmail"]!
             ));
 
             message.To.Add(new MailboxAddress(firstName, toEmail));
@@ -80,7 +80,7 @@ namespace NexWearAPI.Services
                 await client.ConnectAsync(
                     _config["Email:Host"]!,
                     int.Parse(_config["Email:Port"]!),
-                    SecureSocketOptions.SslOnConnect
+                    SecureSocketOptions.StartTls
                 );
 
                 await client.AuthenticateAsync(
