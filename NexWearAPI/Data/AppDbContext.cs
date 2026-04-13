@@ -49,34 +49,26 @@ namespace NexWearAPI.Data
 
             modelBuilder.Entity<Order>()
                 .Property(o => o.Status)
-                .HasConversion<string>();   // Guarda "Pending"/"Paid"/... en lugar de 0/1/...
+                .HasConversion<string>();
 
             modelBuilder.Entity<Order>()
                 .HasOne(o => o.User)
                 .WithMany(u => u.Orders)
                 .HasForeignKey(o => o.UserId)
-                .OnDelete(DeleteBehavior.Restrict);  // No borrar usuario si tiene órdenes
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Order>()
                 .HasIndex(o => o.UserId);
 
+            // ← Solo estos dos, sin duplicados ni PayPal
             modelBuilder.Entity<Order>()
                 .Property(o => o.PaymentMethod)
                 .HasMaxLength(20)
-                .HasDefaultValue("paypal");
+                .HasDefaultValue("mercadopago");
 
             modelBuilder.Entity<Order>()
-                .Property(o => o.PaypalOrderId)
-                .HasMaxLength(50);   
-
-            modelBuilder.Entity<Order>()
-                .Property(o => o.PaymentMethod)
-                .HasMaxLength(20)
-                .HasDefaultValue("card");
-
-            modelBuilder.Entity<Order>()
-                .Property(o => o.PaypalOrderId)
-                .HasMaxLength(100);        
+                .Property(o => o.MPOrderId)
+                .HasMaxLength(100);
 
             // ── OrderItems ───────────────────────────────────────
             modelBuilder.Entity<OrderItem>()

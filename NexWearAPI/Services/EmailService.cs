@@ -1,4 +1,6 @@
-﻿using Resend;
+﻿using MailKit.Security;
+using MimeKit;
+using MailKit.Net.Smtp;
 
 namespace NexWearAPI.Services
 {
@@ -9,32 +11,38 @@ namespace NexWearAPI.Services
 
     public class EmailService : IEmailService
     {
-        private readonly IResend _resend;
         private readonly IConfiguration _config;
+        private readonly ILogger<EmailService> _logger;
 
-        public EmailService(IResend resend, IConfiguration config)
+        public EmailService(IConfiguration config, ILogger<EmailService> logger)
         {
-            _resend = resend;
             _config = config;
+            _logger = logger;
         }
 
         public async Task SendPasswordResetCodeAsync(string toEmail, string firstName, string code)
         {
-            var fromEmail = _config["Resend:FromEmail"]!;
-            var fromName = _config["Resend:FromName"]!;
+            var message = new MimeMessage();
 
-            var message = new EmailMessage
+            message.From.Add(new MailboxAddress(
+                _config["Email:FromName"]!,
+                _config["Email:Username"]!
+            ));
+
+            message.To.Add(new MailboxAddress(firstName, toEmail));
+            message.Subject = "Código de recuperación — NexWear";
+
+            message.Body = new TextPart("html")
             {
-                From = $"{fromName} <{fromEmail}>",
-                To = { toEmail },
-                Subject = "Código de recuperación — NexWear",
-                HtmlBody = $"""
+                Text = $"""
                 <!DOCTYPE html>
                 <html>
-                <body style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+                <body style="font-family: Arial, sans-serif; max-width: 480px;
+                             margin: 0 auto; padding: 24px;">
                     <h2 style="color: #111;">Hola, {firstName} 👋</h2>
                     <p style="color: #555;">
-                        Recibimos una solicitud para restablecer la contraseña de tu cuenta en NexWear.
+                        Recibimos una solicitud para restablecer la contraseña
+                        de tu cuenta en NexWear.
                     </p>
                     <p style="color: #555;">Tu código de recuperación es:</p>
                     <div style="
@@ -55,7 +63,8 @@ namespace NexWearAPI.Services
                         Este código expira en <strong>15 minutos</strong>.
                         Si no solicitaste este cambio, ignora este mensaje.
                     </p>
-                    <hr style="border: none; border-top: 1px solid #e8e8e8; margin: 24px 0;" />
+                    <hr style="border: none; border-top: 1px solid #e8e8e8;
+                               margin: 24px 0;" />
                     <p style="color: #bbb; font-size: 12px; text-align: center;">
                         NexWear · Tu tienda de moda
                     </p>
@@ -64,7 +73,37 @@ namespace NexWearAPI.Services
             """
             };
 
-            await _resend.EmailSendAsync(message);
+            try
+            {
+                using var client = new SmtpClient();
+
+                await client.ConnectAsync(
+                    _config["Email:Host"]!,
+                    int.Parse(_config["Email:Port"]!),
+                    SecureSocketOptions.StartTls
+                );
+
+                await client.AuthenticateAsync(
+                    _config["Email:Username"]!,
+                    _config["Email:Password"]!
+                );
+
+                await client.SendAsync(message);
+                await client.DisconnectAsync(true);
+
+                _logger.LogInformation("Email enviado a {Email}", toEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error completo: {Error} | Inner: {Inner}",
+                    ex.Message, ex.InnerException?.Message);
+                throw;
+            }
+            //catch (Exception ex)
+            //{
+            //    _logger.LogError("Error al enviar email a {Email}: {Error}", toEmail, ex.Message);
+            //    throw;
+            //}
         }
     }
 }

@@ -24,18 +24,39 @@ namespace NexWearAPI.Models
         [Required]
         public decimal Total { get; set; }
 
+        // ── Snapshot de dirección ─────────────────────────────
         [Required]
-        public string ShippingAddress { get; set; } = string.Empty;
+        [MaxLength(255)]
+        public string Street { get; set; } = string.Empty;
+
+        [MaxLength(100)]
+        public string? Interior { get; set; }
+
+        [Required]
+        [MaxLength(100)]
+        public string City { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
+        public string State { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(10)]
+        public string ZipCode { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
+        public string Country { get; set; } = "México";
 
         [MaxLength(20)]
-        public string PaymentMethod { get; set; } = "paypal";
+        public string? Phone { get; set; }
+
+        // ── Pago ──────────────────────────────────────────────
+        [MaxLength(20)]
+        public string PaymentMethod { get; set; } = "mercadopago";
 
         [MaxLength(100)]
-        public string? PaypalOrderId { get; set; }
-
-        // ← NUEVO: ID de la captura, necesario para reembolsos
-        [MaxLength(100)]
-        public string? PaypalCaptureId { get; set; }
+        public string? MPOrderId { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? PaidAt { get; set; }
