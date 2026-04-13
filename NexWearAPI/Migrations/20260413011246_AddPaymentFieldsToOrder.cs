@@ -18,12 +18,6 @@ namespace NexWearAPI.Migrations
                 maxLength: 100,
                 nullable: true);
 
-            migrationBuilder.AddColumn<DateTime>(
-                name: "PaidAt",
-                table: "Orders",
-                type: "timestamp with time zone",
-                nullable: true);
-
             migrationBuilder.AddColumn<string>(
                 name: "PaymentMethod",
                 table: "Orders",
@@ -68,10 +62,6 @@ namespace NexWearAPI.Migrations
 
             migrationBuilder.DropColumn(
                 name: "MPOrderId",
-                table: "Orders");
-
-            migrationBuilder.DropColumn(
-                name: "PaidAt",
                 table: "Orders");
 
             migrationBuilder.DropColumn(
