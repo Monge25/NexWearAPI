@@ -93,19 +93,21 @@ namespace NexWearAPI.Services
                 }
             }
 
-            // ── Crear pago en Mercado Pago ────────────────────────
-            var paymentId = await _mercadoPago.CreatePaymentAsync(
-                total,
-                "Compra NexWear",
-                dto.Token,
-                user.Email,
-                dto.PaymentMethodId ?? "visa"   // ← usar el del frontend
-            );
+            string paymentId = $"SIM-{Guid.NewGuid().ToString()[..8].ToUpper()}";
 
-            var payment = await _mercadoPago.GetPaymentAsync(long.Parse(paymentId));
+            //// ── Crear pago en Mercado Pago ────────────────────────
+            //var paymentId = await _mercadoPago.CreatePaymentAsync(
+            //    total,
+            //    "Compra NexWear",
+            //    dto.Token,
+            //    user.Email,
+            //    dto.PaymentMethodId ?? "visa"   // ← usar el del frontend
+            //);
 
-            if (!payment.Success)
-                throw new InvalidOperationException("El pago no fue aprobado. Intenta de nuevo.");
+            //var payment = await _mercadoPago.GetPaymentAsync(long.Parse(paymentId));
+
+            //if (!payment.Success)
+            //    throw new InvalidOperationException("El pago no fue aprobado. Intenta de nuevo.");
 
             // ── Guardar orden con snapshot de dirección ───────────
             var order = new Order

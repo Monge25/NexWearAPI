@@ -80,7 +80,7 @@ namespace NexWearAPI.Services
                 await client.ConnectAsync(
                     _config["Email:Host"]!,
                     int.Parse(_config["Email:Port"]!),
-                    SecureSocketOptions.StartTls
+                    SecureSocketOptions.SslOnConnect
                 );
 
                 await client.AuthenticateAsync(
