@@ -11,21 +11,24 @@ namespace NexWearAPI.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "MPOrderId",
-                table: "Orders",
-                type: "character varying(100)",
-                maxLength: 100,
-                nullable: true);
+            // PaymentMethod ya existe en Railway, no la agregamos
 
-            migrationBuilder.AddColumn<string>(
-                name: "PaymentMethod",
+            // Renombrar PaypalOrderId → MPOrderId
+            migrationBuilder.RenameColumn(
+                name: "PaypalOrderId",
                 table: "Orders",
-                type: "character varying(20)",
-                maxLength: 20,
-                nullable: false,
-                defaultValue: "mercadopago");
+                newName: "MPOrderId");
 
+            // Eliminar columnas que ya no se usan
+            migrationBuilder.DropColumn(
+                name: "PaypalCaptureId",
+                table: "Orders");
+
+            migrationBuilder.DropColumn(
+                name: "ShippingAddress",
+                table: "Orders");
+
+            // Crear tabla PasswordResetCodes
             migrationBuilder.CreateTable(
                 name: "PasswordResetCodes",
                 columns: table => new
@@ -57,16 +60,24 @@ namespace NexWearAPI.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "PasswordResetCodes");
+            migrationBuilder.DropTable(name: "PasswordResetCodes");
 
-            migrationBuilder.DropColumn(
+            migrationBuilder.RenameColumn(
                 name: "MPOrderId",
-                table: "Orders");
+                table: "Orders",
+                newName: "PaypalOrderId");
 
-            migrationBuilder.DropColumn(
-                name: "PaymentMethod",
-                table: "Orders");
+            migrationBuilder.AddColumn<string>(
+                name: "PaypalCaptureId",
+                table: "Orders",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "ShippingAddress",
+                table: "Orders",
+                type: "text",
+                nullable: false,
+                defaultValue: "");
         }
     }
 }
