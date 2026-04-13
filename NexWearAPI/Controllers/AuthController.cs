@@ -2,11 +2,13 @@
 using Microsoft.AspNetCore.Mvc;
 using NexWearAPI.DTOs;
 using NexWearAPI.Services;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace NexWearAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [EnableRateLimiting("auth")]
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
