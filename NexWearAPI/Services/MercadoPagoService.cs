@@ -6,7 +6,7 @@ namespace NexWearAPI.Services
 {
     public interface IMercadoPagoService
     {
-        Task<string> CreatePaymentAsync(decimal amount, string description, string token, string payerEmail);
+        Task<string> CreatePaymentAsync(decimal amount, string description, string token, string payerEmail, string paymentMethodId = "visa");
         Task<MpPaymentResult> GetPaymentAsync(long paymentId);
     }
 
@@ -23,7 +23,7 @@ namespace NexWearAPI.Services
                 ?? throw new InvalidOperationException("MercadoPago:AccessToken no configurado.");
         }
 
-        public async Task<string> CreatePaymentAsync(decimal amount, string description, string token, string payerEmail)
+        public async Task<string> CreatePaymentAsync(decimal amount, string description, string token, string payerEmail, string paymentMethodId = "visa")
         {
             var client = new PaymentClient();
             var request = new PaymentCreateRequest
@@ -32,6 +32,7 @@ namespace NexWearAPI.Services
                 Description = description,
                 Token = token,
                 Installments = 1,
+                PaymentMethodId = "visa",   // ← agregar esto
                 Payer = new PaymentPayerRequest
                 {
                     Email = payerEmail
@@ -40,7 +41,14 @@ namespace NexWearAPI.Services
 
             Payment payment = await client.CreateAsync(request);
 
-            _logger.LogInformation("Pago MP creado: {Id} - {Status}", payment.Id, payment.Status);
+            _logger.LogInformation("Pago MP: {Id} - Status: {Status} - Detail: {Detail}",
+                payment.Id, payment.Status, payment.StatusDetail);
+
+            // Si fue rechazado lanzar excepción con detalle
+            if (payment.Status != "approved" && payment.Status != "in_process")
+                throw new InvalidOperationException(
+                    $"Pago rechazado: {payment.StatusDetail ?? payment.Status}");
+
             return payment.Id.ToString()!;
         }
 

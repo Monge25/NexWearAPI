@@ -98,7 +98,9 @@ namespace NexWearAPI.Services
                 total,
                 "Compra NexWear",
                 dto.Token,
-                user.Email);
+                user.Email,
+                dto.PaymentMethodId ?? "visa"   // ← usar el del frontend
+            );
 
             var payment = await _mercadoPago.GetPaymentAsync(long.Parse(paymentId));
 

@@ -5,9 +5,9 @@ namespace NexWearAPI.DTOs
     // ── Request: datos del pago desde el frontend ─────────────────────────────────
     public class MpCheckoutDto
     {
-        // Lo que ya tenías
         [Required]
         public string Token { get; set; } = string.Empty;
+        public string? PaymentMethodId { get; set; }
 
         // ── Dirección ─────────────────────────────────────────
         // Opción A: dirección guardada
