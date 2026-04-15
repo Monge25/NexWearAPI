@@ -92,7 +92,7 @@ builder.Services.AddScoped<IProductVariantService, ProductVariantService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
-builder.Services.AddScoped<IMercadoPagoService, MercadoPagoService>();
+builder.Services.AddScoped<IStripeService, StripeService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAdminService, AdminService>();

@@ -3,30 +3,25 @@
 namespace NexWearAPI.DTOs
 {
     // ── Request: datos del pago desde el frontend ─────────────────────────────────
-    public class MpCheckoutDto
-    {
-        [Required]
-        public string Token { get; set; } = string.Empty;
-        public string? PaymentMethodId { get; set; }
+ public class StripeCheckoutDto
+{
+    [Required]
+    public string PaymentMethodId { get; set; } = string.Empty; // viene de Stripe.js
 
-        // ── Dirección ─────────────────────────────────────────
-        // Opción A: dirección guardada
-        public Guid? AddressId { get; set; }
+    // ── Dirección ─────────────────────────────────────────
+    public Guid? AddressId { get; set; }
 
-        // Opción B: dirección nueva
-        public string? Street { get; set; }
-        public string? Interior { get; set; }
-        public string? City { get; set; }
-        public string? State { get; set; }
-        public string? ZipCode { get; set; }
-        public string? Country { get; set; }
-        public string? Phone { get; set; }
+    public string? Street { get; set; }
+    public string? Interior { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? ZipCode { get; set; }
+    public string? Country { get; set; }
+    public string? Phone { get; set; }
 
-        // Guardar dirección nueva para después
-        public bool SaveAddress { get; set; } = false;
-        public string? AddressAlias { get; set; }
-    }
-
+    public bool SaveAddress { get; set; } = false;
+    public string? AddressAlias { get; set; }
+}
     // ── Response: detalle de un item dentro de la orden ───────────────────────────
     public class OrderItemResponseDto
     {
