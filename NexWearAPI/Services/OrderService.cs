@@ -7,7 +7,7 @@ namespace NexWearAPI.Services
 {
     public interface IOrderService
     {
-        Task<OrderResponseDto> CheckoutAsync(Guid userId, MpCheckoutDto dto);
+        Task<OrderResponseDto> CheckoutAsync(Guid userId, StripeCheckoutDto dto);
         Task<IEnumerable<OrderResponseDto>> GetMyOrdersAsync(Guid userId);
         Task<OrderResponseDto?> GetByIdAsync(Guid userId, Guid orderId);
     }
@@ -15,22 +15,25 @@ namespace NexWearAPI.Services
     public class OrderService : IOrderService
     {
         private readonly AppDbContext _context;
-        private readonly IMercadoPagoService _mercadoPago;
+        private readonly IStripeService _stripe;
+        private readonly IEmailService _email;                           // ← NUEVO
         private readonly ILogger<OrderService> _logger;
 
         public OrderService(
             AppDbContext context,
-            IMercadoPagoService mercadoPago,
+            IStripeService stripe,
+            IEmailService email,                                         // ← NUEVO
             ILogger<OrderService> logger)
         {
             _context = context;
-            _mercadoPago = mercadoPago;
+            _stripe = stripe;
+            _email = email;                                              // ← NUEVO
             _logger = logger;
         }
 
         // ── Checkout: crear pago y guardar orden ──────────────────────────────────
 
-        public async Task<OrderResponseDto> CheckoutAsync(Guid userId, MpCheckoutDto dto)
+        public async Task<OrderResponseDto> CheckoutAsync(Guid userId, StripeCheckoutDto dto)
         {
             var cartItems = await GetAndValidateCart(userId);
             var orderItems = BuildOrderItems(cartItems);
@@ -46,92 +49,96 @@ namespace NexWearAPI.Services
 
             if (dto.AddressId.HasValue)
             {
-                // Usar dirección guardada
                 var saved = await _context.Addresses
                     .FirstOrDefaultAsync(a => a.Id == dto.AddressId && a.UserId == userId);
 
                 if (saved is null)
                     throw new InvalidOperationException("Dirección no encontrada.");
 
-                street = saved.Street;
+                street   = saved.Street;
                 interior = saved.Interior;
-                city = saved.City;
-                state = saved.State;
-                zipCode = saved.ZipCode;
-                country = saved.Country;
-                phone = saved.Phone;
+                city     = saved.City;
+                state    = saved.State;
+                zipCode  = saved.ZipCode;
+                country  = saved.Country;
+                phone    = saved.Phone;
             }
             else
             {
-                // Usar dirección escrita en el checkout
                 if (string.IsNullOrWhiteSpace(dto.Street) || string.IsNullOrWhiteSpace(dto.City))
                     throw new InvalidOperationException("Se requiere una dirección de envío.");
 
-                street = dto.Street!;
+                street   = dto.Street!;
                 interior = dto.Interior;
-                city = dto.City!;
-                state = dto.State ?? "";
-                zipCode = dto.ZipCode ?? "";
-                country = dto.Country ?? "México";
-                phone = dto.Phone;
+                city     = dto.City!;
+                state    = dto.State ?? "";
+                zipCode  = dto.ZipCode ?? "";
+                country  = dto.Country ?? "México";
+                phone    = dto.Phone;
 
-                // Guardar como nueva dirección si el usuario lo pidió
                 if (dto.SaveAddress && !string.IsNullOrWhiteSpace(dto.AddressAlias))
                 {
                     _context.Addresses.Add(new Address
                     {
-                        UserId = userId,
-                        Alias = dto.AddressAlias,
-                        Street = street,
+                        UserId   = userId,
+                        Alias    = dto.AddressAlias,
+                        Street   = street,
                         Interior = interior,
-                        City = city,
-                        State = state,
-                        ZipCode = zipCode,
-                        Country = country,
-                        Phone = phone,
+                        City     = city,
+                        State    = state,
+                        ZipCode  = zipCode,
+                        Country  = country,
+                        Phone    = phone,
                     });
                 }
             }
 
-            string paymentId = $"SIM-{Guid.NewGuid().ToString()[..8].ToUpper()}";
+            // ── Crear pago en Stripe ──────────────────────────────
+            var paymentId = await _stripe.CreatePaymentAsync(
+                total,
+                "Compra NexWear",
+                dto.PaymentMethodId,
+                user.Email
+            );
 
-            //// ── Crear pago en Mercado Pago ────────────────────────
-            //var paymentId = await _mercadoPago.CreatePaymentAsync(
-            //    total,
-            //    "Compra NexWear",
-            //    dto.Token,
-            //    user.Email,
-            //    dto.PaymentMethodId ?? "visa"   // ← usar el del frontend
-            //);
+            var payment = await _stripe.GetPaymentAsync(paymentId);
 
-            //var payment = await _mercadoPago.GetPaymentAsync(long.Parse(paymentId));
+            if (!payment.Success)
+                throw new InvalidOperationException("El pago no fue aprobado. Intenta de nuevo.");
 
-            //if (!payment.Success)
-            //    throw new InvalidOperationException("El pago no fue aprobado. Intenta de nuevo.");
-
-            // ── Guardar orden con snapshot de dirección ───────────
+            // ── Guardar orden ─────────────────────────────────────
             var order = new Order
             {
-                UserId = userId,
-                Status = OrderStatus.Paid,
-                Total = total,
-                Street = street,
-                Interior = interior,
-                City = city,
-                State = state,
-                ZipCode = zipCode,
-                Country = country,
-                Phone = phone,
-                PaymentMethod = "mercadopago",
-                MPOrderId = paymentId,
-                PaidAt = DateTime.UtcNow,
-                OrderItems = orderItems,
+                UserId        = userId,
+                Status        = OrderStatus.Paid,
+                Total         = total,
+                Street        = street,
+                Interior      = interior,
+                City          = city,
+                State         = state,
+                ZipCode       = zipCode,
+                Country       = country,
+                Phone         = phone,
+                PaymentMethod = "stripe",
+                MPOrderId     = paymentId,
+                PaidAt        = DateTime.UtcNow,
+                OrderItems    = orderItems,
             };
 
             await SaveOrder(order, cartItems);
 
-            _logger.LogInformation("Orden {OrderId} pagada con Mercado Pago. PaymentId: {PaymentId}",
+            _logger.LogInformation("Orden {OrderId} pagada con Stripe. PaymentIntentId: {PaymentId}",
                 order.Id, paymentId);
+
+            // ── Enviar email de confirmación ──────────────────────         // ← NUEVO
+            try
+            {
+                await _email.SendOrderStatusEmailAsync(order, user.FirstName, user.Email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error enviando email de orden {OrderId}: {Error}", order.Id, ex.Message);
+            }
 
             return MapToDto(order);
         }
@@ -197,13 +204,13 @@ namespace NexWearAPI.Services
 
                 return new OrderItem
                 {
-                    ProductId = c.ProductId,
-                    VariantId = c.VariantId,
-                    Quantity = c.Quantity,
-                    UnitPrice = price,
-                    ProductName = c.Product.Name,
+                    ProductId    = c.ProductId,
+                    VariantId    = c.VariantId,
+                    Quantity     = c.Quantity,
+                    UnitPrice    = price,
+                    ProductName  = c.Product.Name,
                     VariantColor = c.Variant.Color,
-                    VariantSize = c.Variant.Size
+                    VariantSize  = c.Variant.Size
                 };
             }).ToList();
 
@@ -220,34 +227,31 @@ namespace NexWearAPI.Services
 
         private static OrderResponseDto MapToDto(Order order) => new()
         {
-            Id = order.Id,
+            Id          = order.Id,
             OrderNumber = $"ORD-{order.Id.ToString()[..8].ToUpper()}",
-            Status = order.Status.ToString(),
-            Total = order.Total,
-            CreatedAt = order.CreatedAt,
-            PaidAt = order.PaidAt,
-
-            // ── Dirección snapshot ────────────────────────────────
-            Street = order.Street,
-            Interior = order.Interior,
-            City = order.City,
-            State = order.State,
-            ZipCode = order.ZipCode,
-            Country = order.Country,
-            Phone = order.Phone,
-
-            Items = order.OrderItems.Select(i => new OrderItemResponseDto
+            Status      = order.Status.ToString(),
+            Total       = order.Total,
+            CreatedAt   = order.CreatedAt,
+            PaidAt      = order.PaidAt,
+            Street      = order.Street,
+            Interior    = order.Interior,
+            City        = order.City,
+            State       = order.State,
+            ZipCode     = order.ZipCode,
+            Country     = order.Country,
+            Phone       = order.Phone,
+            Items       = order.OrderItems.Select(i => new OrderItemResponseDto
             {
-                Id = i.Id,
-                ProductId = i.ProductId,
-                VariantId = i.VariantId,
-                ProductName = i.ProductName,
+                Id           = i.Id,
+                ProductId    = i.ProductId,
+                VariantId    = i.VariantId,
+                ProductName  = i.ProductName,
                 VariantColor = i.VariantColor,
-                VariantSize = i.VariantSize,
-                ImageUrl = i.Variant?.ImageUrl ?? i.Product?.ImageUrl,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice,
-                Total = i.UnitPrice * i.Quantity,
+                VariantSize  = i.VariantSize,
+                ImageUrl     = i.Variant?.ImageUrl ?? i.Product?.ImageUrl,
+                Quantity     = i.Quantity,
+                UnitPrice    = i.UnitPrice,
+                Total        = i.UnitPrice * i.Quantity,
             })
         };
     }

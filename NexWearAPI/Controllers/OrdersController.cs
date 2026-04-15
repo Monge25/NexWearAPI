@@ -31,7 +31,7 @@ namespace NexWearAPI.Controllers
         /// El frontend manda el token de tarjeta generado por MP.js y la dirección.
         /// </summary>
         [HttpPost("checkout")]
-        public async Task<IActionResult> Checkout([FromBody] MpCheckoutDto dto)
+        public async Task<IActionResult> Checkout([FromBody] StripeCheckoutDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             try

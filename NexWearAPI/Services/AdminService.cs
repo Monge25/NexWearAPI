@@ -20,13 +20,21 @@ namespace NexWearAPI.Services
     public class AdminService : IAdminService
     {
         private readonly AppDbContext _context;
+        private readonly IEmailService _email;                           // ← NUEVO
+        private readonly ILogger<AdminService> _logger;                  // ← NUEVO
 
-        public AdminService(AppDbContext context)
+        public AdminService(
+            AppDbContext context,
+            IEmailService email,                                         // ← NUEVO
+            ILogger<AdminService> logger)                                // ← NUEVO
         {
             _context = context;
+            _email   = email;                                            // ← NUEVO
+            _logger  = logger;                                           // ← NUEVO
         }
 
         // ── Listar usuarios ───────────────────────────────────────
+
         public async Task<AdminUsersResponseDto> GetUsersAsync(
             int page, int pageSize, string? search, string? role)
         {
@@ -59,9 +67,9 @@ namespace NexWearAPI.Services
                 .GroupBy(o => o.UserId)
                 .Select(g => new
                 {
-                    UserId = g.Key,
-                    TotalOrders = g.Count(),
-                    TotalSpent = g.Sum(o => o.Total),
+                    UserId        = g.Key,
+                    TotalOrders   = g.Count(),
+                    TotalSpent    = g.Sum(o => o.Total),
                     LastOrderDate = g.Max(o => o.CreatedAt)
                 })
                 .ToListAsync();
@@ -71,30 +79,30 @@ namespace NexWearAPI.Services
                 var stats = orderStats.FirstOrDefault(s => s.UserId == u.Id);
                 return new AdminUserResponseDto
                 {
-                    Id = u.Id,
-                    Email = u.Email,
-                    FirstName = u.FirstName,
-                    LastName = u.LastName,
-                    Role = u.Role.ToString(),
-                    // IsActive = u.IsActive,
-                    CreatedAt = u.CreatedAt,
-                    TotalOrders = stats?.TotalOrders ?? 0,
-                    TotalSpent = stats?.TotalSpent ?? 0,
+                    Id            = u.Id,
+                    Email         = u.Email,
+                    FirstName     = u.FirstName,
+                    LastName      = u.LastName,
+                    Role          = u.Role.ToString(),
+                    CreatedAt     = u.CreatedAt,
+                    TotalOrders   = stats?.TotalOrders ?? 0,
+                    TotalSpent    = stats?.TotalSpent ?? 0,
                     LastOrderDate = stats?.LastOrderDate.ToString("dd/MM/yyyy") ?? "Sin órdenes",
                 };
             });
 
             return new AdminUsersResponseDto
             {
-                Users = dtos,
-                Total = total,
-                Page = page,
-                PageSize = pageSize,
+                Users      = dtos,
+                Total      = total,
+                Page       = page,
+                PageSize   = pageSize,
                 TotalPages = (int)Math.Ceiling((double)total / pageSize),
             };
         }
 
         // ── Cambiar rol de usuario ────────────────────────────────
+
         public async Task<AdminUserResponseDto?> UpdateUserRoleAsync(Guid userId, string role)
         {
             var user = await _context.Users.FindAsync(userId);
@@ -108,17 +116,17 @@ namespace NexWearAPI.Services
 
             return new AdminUserResponseDto
             {
-                Id = user.Id,
-                Email = user.Email,
+                Id        = user.Id,
+                Email     = user.Email,
                 FirstName = user.FirstName,
-                LastName = user.LastName,
-                Role = user.Role.ToString(),
-                // IsActive = user.IsActive,
+                LastName  = user.LastName,
+                Role      = user.Role.ToString(),
                 CreatedAt = user.CreatedAt,
             };
         }
 
         // ── Listar todas las órdenes ──────────────────────────────
+
         public async Task<AdminOrdersResponseDto> GetOrdersAsync(
             int page, int pageSize, string? status)
         {
@@ -136,45 +144,41 @@ namespace NexWearAPI.Services
                 .OrderByDescending(o => o.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Variant)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
+                .Include(o => o.OrderItems).ThenInclude(oi => oi.Variant)
+                .Include(o => o.OrderItems).ThenInclude(oi => oi.Product)
                 .ToListAsync();
 
             return new AdminOrdersResponseDto
             {
-                Orders = orders.Select(MapOrderToDto),
-                Total = total,
-                Page = page,
-                PageSize = pageSize,
+                Orders     = orders.Select(MapOrderToDto),
+                Total      = total,
+                Page       = page,
+                PageSize   = pageSize,
                 TotalPages = (int)Math.Ceiling((double)total / pageSize),
             };
         }
 
         // ── Detalle de una orden ──────────────────────────────────
+
         public async Task<AdminOrderResponseDto?> GetOrderByIdAsync(Guid orderId)
         {
             var order = await _context.Orders
                 .Include(o => o.User)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Variant)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
+                .Include(o => o.OrderItems).ThenInclude(oi => oi.Variant)
+                .Include(o => o.OrderItems).ThenInclude(oi => oi.Product)
                 .FirstOrDefaultAsync(o => o.Id == orderId);
 
             return order is null ? null : MapOrderToDto(order);
         }
 
         // ── Cambiar estado de una orden ───────────────────────────
+
         public async Task<AdminOrderResponseDto?> UpdateOrderStatusAsync(Guid orderId, string status)
         {
             var order = await _context.Orders
                 .Include(o => o.User)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Variant)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
+                .Include(o => o.OrderItems).ThenInclude(oi => oi.Variant)
+                .Include(o => o.OrderItems).ThenInclude(oi => oi.Product)
                 .FirstOrDefaultAsync(o => o.Id == orderId);
 
             if (order is null) return null;
@@ -185,36 +189,50 @@ namespace NexWearAPI.Services
             order.Status = statusEnum;
             await _context.SaveChangesAsync();
 
+            // ── Enviar email al cliente según el nuevo estado ─────         // ← NUEVO
+            if (order.User is not null)
+            {
+                try
+                {
+                    await _email.SendOrderStatusEmailAsync(order, order.User.FirstName, order.User.Email);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Error enviando email de orden {OrderId}: {Error}", orderId, ex.Message);
+                }
+            }
+
             return MapOrderToDto(order);
         }
 
         // ── Mapper ────────────────────────────────────────────────
+
         private static AdminOrderResponseDto MapOrderToDto(Order o) => new()
         {
-            Id = o.Id,
-            OrderNumber = $"ORD-{o.Id.ToString()[..8].ToUpper()}",
-            Status = o.Status.ToString(),
-            Total = o.Total,
-            CreatedAt = o.CreatedAt,
+            Id            = o.Id,
+            OrderNumber   = $"ORD-{o.Id.ToString()[..8].ToUpper()}",
+            Status        = o.Status.ToString(),
+            Total         = o.Total,
+            CreatedAt     = o.CreatedAt,
             CustomerEmail = o.User?.Email ?? "",
-            CustomerName = $"{o.User?.FirstName} {o.User?.LastName}".Trim(),
-            Street = o.Street,
-            Interior = o.Interior,
-            City = o.City,
-            State = o.State,
-            ZipCode = o.ZipCode,
-            Country = o.Country,
-            Phone = o.Phone,
-            Items = o.OrderItems.Select(i => new AdminOrderItemDto
+            CustomerName  = $"{o.User?.FirstName} {o.User?.LastName}".Trim(),
+            Street        = o.Street,
+            Interior      = o.Interior,
+            City          = o.City,
+            State         = o.State,
+            ZipCode       = o.ZipCode,
+            Country       = o.Country,
+            Phone         = o.Phone,
+            Items         = o.OrderItems.Select(i => new AdminOrderItemDto
             {
-                Id = i.Id,
-                ProductName = i.ProductName,
+                Id           = i.Id,
+                ProductName  = i.ProductName,
                 VariantColor = i.VariantColor,
-                VariantSize = i.VariantSize,
-                ImageUrl = i.Variant?.ImageUrl ?? i.Product?.ImageUrl,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice,
-                Total = i.UnitPrice * i.Quantity,
+                VariantSize  = i.VariantSize,
+                ImageUrl     = i.Variant?.ImageUrl ?? i.Product?.ImageUrl,
+                Quantity     = i.Quantity,
+                UnitPrice    = i.UnitPrice,
+                Total        = i.UnitPrice * i.Quantity,
             })
         };
     }
