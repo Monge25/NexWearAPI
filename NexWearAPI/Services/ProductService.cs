@@ -17,8 +17,17 @@ namespace NexWearAPI.Services
             decimal? maxPrice, 
             string? sortBy, 
             bool? isOnSale,
-            int page,
-            int pageSize);
+            int? page,
+            int? pageSize);
+        Task<PagedResult<ProductWithVariantsDto>> GetProductsWithVariantsAsync(
+            string? category,
+            string? search,
+            decimal? minPrice,
+            decimal? maxPrice,
+            string? sortBy,
+            bool? isOnSale,
+            int? page,
+            int? pageSize);
         Task<ProductResponseDto?> GetProductByIdAsync(Guid id);
         Task<ProductResponseDto> CreateAsync(CreateProductDto dto);
         Task<ProductResponseDto?> UpdateAsync(Guid id, UpdateProductDto dto);
@@ -46,11 +55,15 @@ namespace NexWearAPI.Services
             decimal? maxPrice, 
             string? sortBy, 
             bool? isOnSale,
-            int page = 1,
-            int pageSize = 10)
+            int? page,
+            int? pageSize)
         {
-            page = page < 1 ? 1 : page;
-            pageSize = pageSize > 50 ? 50 : pageSize; // límite máximo de 50
+            page = (page == null || page < 1) ? 1 : page;
+            pageSize = (pageSize == null || pageSize < 1) ? 12 : pageSize;
+
+            pageSize = pageSize > 50 ? 50 : pageSize;
+            int currentPage = page.Value;
+            int currentPageSize = pageSize.Value;
 
             // A03 - EF Core usa queries parametrizados, nunca SQL crudo
             var query = _context.Products
@@ -86,19 +99,85 @@ namespace NexWearAPI.Services
             var totalCount = await query.CountAsync();
 
             var products = await query
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
+                .Skip((currentPage - 1) * currentPageSize)
+                .Take(currentPageSize)
                 .ToListAsync();
 
             return new PagedResult<ProductResponseDto>
             {
                 Items = products.Select(MapToDto),
-                Page = page,
-                PageSize = pageSize,
+                Page = currentPage,
+                PageSize = currentPageSize,
                 TotalCount = totalCount
             };
 
             // return products.Select(MapToDto);
+        }
+
+        public async Task<PagedResult<ProductWithVariantsDto>> GetProductsWithVariantsAsync(
+            string? category,
+            string? search,
+            decimal? minPrice,
+            decimal? maxPrice,
+            string? sortBy,
+            bool? isOnSale,
+            int? page,
+            int? pageSize)
+        {
+            page = (page == null || page < 1) ? 1 : page;
+            pageSize = (pageSize == null || pageSize < 1) ? 12 : pageSize;
+            pageSize = pageSize > 50 ? 50 : pageSize;
+
+            int currentPage = page.Value;
+            int currentPageSize = pageSize.Value;
+
+            var query = _context.Products
+                .Include(p => p.Variants) // 🔥 importante
+                .Where(p => p.IsActive)
+                .AsQueryable();
+
+            // 🔎 Filtros
+            if (!string.IsNullOrWhiteSpace(category))
+                query = query.Where(p => p.Category.ToLower() == category.ToLower());
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(p =>
+                    p.Name.ToLower().Contains(search.ToLower()) ||
+                    (p.Description != null && p.Description.ToLower().Contains(search.ToLower())));
+
+            if (minPrice.HasValue)
+                query = query.Where(p => p.Price >= minPrice.Value);
+
+            if (maxPrice.HasValue)
+                query = query.Where(p => p.Price <= maxPrice.Value);
+
+            if (isOnSale == true)
+                query = query.Where(p => p.Variants.Any(v => v.IsOnSale && v.IsActive));
+
+            // 🔃 Ordenamiento
+            query = sortBy switch
+            {
+                "price_asc" => query.OrderBy(p => p.Price),
+                "price_desc" => query.OrderByDescending(p => p.Price),
+                "createdAt_asc" => query.OrderBy(p => p.CreatedAt),
+                "createdAt_desc" => query.OrderByDescending(p => p.CreatedAt),
+                _ => query.OrderByDescending(p => p.CreatedAt)
+            };
+
+            var totalCount = await query.CountAsync();
+
+            var products = await query
+                .Skip((currentPage - 1) * currentPageSize)
+                .Take(currentPageSize)
+                .ToListAsync();
+
+            return new PagedResult<ProductWithVariantsDto>
+            {
+                Items = products.Select(p => MapToDtoWithVariants(p, isOnSale)),
+                Page = currentPage,
+                PageSize = currentPageSize,
+                TotalCount = totalCount
+            };
         }
 
         // ── Obtener producto por ID ───────────────────────────────
@@ -184,7 +263,7 @@ namespace NexWearAPI.Services
             Origin = p.Origin
         };
 
-        private static ProductWithVariantsDto MapToDtoWithVariants(Product p) => new()
+        private static ProductWithVariantsDto MapToDtoWithVariants(Product p, bool? isOnSale) => new()
         {
             Id = p.Id,
             Name = p.Name,
@@ -194,7 +273,9 @@ namespace NexWearAPI.Services
             Category = p.Category,
             IsActive = p.IsActive,
             CreatedAt = p.CreatedAt,
-            Variants = p.Variants.Select(v => new VariantResponseDto
+            Variants = p.Variants
+            .Where(v => v.IsActive && (isOnSale != true || v.IsOnSale))
+            .Select(v => new VariantResponseDto
             {
                 Id = v.Id,
                 Color = v.Color,
@@ -204,12 +285,10 @@ namespace NexWearAPI.Services
                 FinalPrice = p.Price + v.PriceModifier,
                 Stock = v.Stock,
                 ImageUrl = v.ImageUrl,
-                IsActive = v.IsActive
+                IsActive = v.IsActive, 
+                IsOnSale = v.IsOnSale,
+                SalePrice = v.SalePrice
             })
         };
-        //public Task<IActionResult> UploadImageAsync(Guid id, IFormFile file)
-        //{
-        //    throw new NotImplementedException();
-        //}
     }
 }
