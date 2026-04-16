@@ -1,7 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NexWearAPI.Constants;
 using NexWearAPI.DTOs;
+using NexWearAPI.Extensions;
 using NexWearAPI.Services;
+using System.Security.Claims;
 
 namespace NexWearAPI.Controllers
 {
@@ -12,12 +15,17 @@ namespace NexWearAPI.Controllers
     {
         private readonly IAdminService _adminService;
         private readonly ILogger<AdminController> _logger;
+        private readonly IAuditService _auditService;
 
-        public AdminController(IAdminService adminService, ILogger<AdminController> logger)
+        public AdminController(IAdminService adminService, ILogger<AdminController> logger, IAuditService auditService)
         {
             _adminService = adminService;
             _logger = logger;
+            _auditService = auditService;
         }
+
+        private Guid GetAdminId() =>
+            Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
 
         // ════════════════════════════════════════════════════════
         //  USUARIOS
@@ -86,15 +94,34 @@ namespace NexWearAPI.Controllers
         public async Task<IActionResult> UpdateOrderStatus(Guid orderId, [FromBody] UpdateOrderStatusDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
-
             var order = await _adminService.UpdateOrderStatusAsync(orderId, dto.Status);
-            if (order is null)
-                return BadRequest(new { message = "Orden no encontrada o estado inválido." });
+            if (order is null) return BadRequest(new { message = "Orden no encontrada o estado inválido." });
 
-            _logger.LogInformation("Estado de orden actualizado: {OrderId} → {Status}",
-                orderId, dto.Status);
-
+            await _auditService.LogAsync(AuditActions.ADMIN_ORDER_STATUS_CHANGED, AuditCategories.Admin, "SUCCESS",
+                new { orderId, newStatus = dto.Status },
+                userId: GetAdminId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
             return Ok(order);
+        }
+
+        /// <summary>Logs de auditoria del sistema (solo Admin)</summary>
+        [HttpGet("audit-logs")]
+        public async Task<IActionResult> GetAuditLogs(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 50,
+            [FromQuery] string? action = null,
+            [FromQuery] string? category = null,
+            [FromQuery] string? result = null,
+            [FromQuery] string? search = null,
+            [FromQuery] DateTime? from = null,
+            [FromQuery] DateTime? to = null)
+        {
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 200);
+
+            var logs = await _adminService.GetAuditLogsAsync(
+                page, pageSize, action, category, result, search, from, to);
+
+            return Ok(logs);
         }
     }
 }

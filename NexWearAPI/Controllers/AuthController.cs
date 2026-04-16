@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NexWearAPI.DTOs;
-using NexWearAPI.Services;
 using Microsoft.AspNetCore.RateLimiting;
+using NexWearAPI.Constants;
+using NexWearAPI.DTOs;
+using NexWearAPI.Extensions;
+using NexWearAPI.Services;
 
 namespace NexWearAPI.Controllers
 {
@@ -13,33 +15,32 @@ namespace NexWearAPI.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
+        private readonly IAuditService _auditService;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger, IAuditService auditService)
         {
             _authService = authService;
             _logger = logger;
+            _auditService = auditService;
         }
 
         /// <summary>Registrar un nuevo usuario</summary>
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto dto)
         {
-            // A08 - Las validaciones del DTO se ejecutan automáticamente
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
+            if (!ModelState.IsValid) return BadRequest(ModelState);
             var result = await _authService.RegisterAsync(dto);
-
             if (result is null)
             {
-                // A07 - Mensaje genérico, no revelar si el email ya existe
+                await _auditService.LogAsync(AuditActions.REGISTER, AuditCategories.Auth, "ERROR",
+                    new { email = dto.Email, razon = "Email ya registrado" },
+                    userEmail: dto.Email, ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
                 return Conflict(new { message = "No fue posible completar el registro." });
             }
-
-            // A09 - Log de registro exitoso
-            _logger.LogInformation("Nuevo usuario registrado: {Email} a las {Time}",
-                dto.Email, DateTime.UtcNow);
-
+            await _auditService.LogAsync(AuditActions.REGISTER, AuditCategories.Auth, "SUCCESS",
+                new { email = dto.Email },
+                userId: result.UserId, userEmail: dto.Email,
+                ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
             return CreatedAtAction(nameof(Register), result);
         }
 
@@ -66,25 +67,19 @@ namespace NexWearAPI.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
+            if (!ModelState.IsValid) return BadRequest(ModelState);
             var result = await _authService.LoginAsync(dto);
-
             if (result is null)
             {
-                // A09 - Log de intento fallido (sin revelar si el email existe)
-                _logger.LogWarning("Intento de login fallido para: {Email} a las {Time}",
-                    dto.Email, DateTime.UtcNow);
-
-                // A07 - Siempre el mismo mensaje, nunca revelar si el email existe o no
+                await _auditService.LogAsync(AuditActions.LOGIN_FAILED, AuditCategories.Auth, "ERROR",
+                    new { email = dto.Email },
+                    userEmail: dto.Email, ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
                 return Unauthorized(new { message = "Credenciales inválidas." });
             }
-
-            // A09 - Log de login exitoso
-            _logger.LogInformation("Login exitoso: {Email} a las {Time}",
-                dto.Email, DateTime.UtcNow);
-
+            await _auditService.LogAsync(AuditActions.LOGIN_SUCCESS, AuditCategories.Auth, "SUCCESS",
+                new { email = dto.Email },
+                userEmail: dto.Email,
+                ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
             return Ok(result);
         }
 
@@ -93,11 +88,15 @@ namespace NexWearAPI.Controllers
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
-
-            await _authService.ForgotPasswordAsync(dto);
-
-            // A07 - Siempre responder igual para no revelar si el email existe
-            return Ok(new { message = "Si el email está registrado, recibirás un código en breve." });
+            _ = Task.Run(async () =>
+            {
+                try { await _authService.ForgotPasswordAsync(dto); }
+                catch (Exception ex) { _logger.LogError("Error enviando email: {Error}", ex.Message); }
+            });
+            _ = _auditService.LogAsync(AuditActions.PASSWORD_RESET_REQUEST, AuditCategories.Auth, "SUCCESS",
+                new { email = dto.Email },
+                userEmail: dto.Email, ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
+            return Ok(new { message = "Si el email está registrado, recibirá un código en breve." });
         }
 
         /// <summary>Verificar si el código es válido</summary>
@@ -119,15 +118,17 @@ namespace NexWearAPI.Controllers
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
-
             var result = await _authService.ResetPasswordAsync(dto);
-
             if (!result)
+            {
+                await _auditService.LogAsync(AuditActions.PASSWORD_RESET_SUCCESS, AuditCategories.Auth, "ERROR",
+                    new { email = dto.Email, razon = "Código inválido o expirado" },
+                    userEmail: dto.Email, ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
                 return BadRequest(new { message = "Código inválido o expirado." });
-
-            _logger.LogInformation("Contraseña restablecida para: {Email} a las {Time}",
-                dto.Email, DateTime.UtcNow);
-
+            }
+            await _auditService.LogAsync(AuditActions.PASSWORD_RESET_SUCCESS, AuditCategories.Auth, "SUCCESS",
+                new { email = dto.Email },
+                userEmail: dto.Email, ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
             return Ok(new { message = "Contraseña restablecida correctamente." });
         }
     }

@@ -132,11 +132,11 @@ namespace NexWearAPI.Services
             int currentPageSize = pageSize.Value;
 
             var query = _context.Products
-                .Include(p => p.Variants) // 🔥 importante
+                .Include(p => p.Variants) // importante
                 .Where(p => p.IsActive)
                 .AsQueryable();
 
-            // 🔎 Filtros
+            // Filtros
             if (!string.IsNullOrWhiteSpace(category))
                 query = query.Where(p => p.Category.ToLower() == category.ToLower());
 
@@ -154,7 +154,7 @@ namespace NexWearAPI.Services
             if (isOnSale == true)
                 query = query.Where(p => p.Variants.Any(v => v.IsOnSale && v.IsActive));
 
-            // 🔃 Ordenamiento
+            // Ordenamiento
             query = sortBy switch
             {
                 "price_asc" => query.OrderBy(p => p.Price),
