@@ -29,12 +29,28 @@ namespace NexWearAPI.Controllers
             [FromQuery] string? search,
             [FromQuery] decimal? minPrice,
             [FromQuery] decimal? maxPrice,
-            [FromQuery] string? sortBy, 
+            [FromQuery] string? sortBy,
             [FromQuery] bool? isOnSale,
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 10)
+            [FromQuery] int? page,
+            [FromQuery] int? pageSize)
         {
             var products = await _productService.GetAllProductsAsync(category, search, minPrice, maxPrice, sortBy, isOnSale, page, pageSize);
+            return Ok(products);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("with-variants")]
+        public async Task<IActionResult> GetAllWithVariants(
+            [FromQuery] string? category,
+            [FromQuery] string? search,
+            [FromQuery] decimal? minPrice,
+            [FromQuery] decimal? maxPrice,
+            [FromQuery] string? sortBy,
+            [FromQuery] bool? isOnSale,
+            [FromQuery] int? page,
+            [FromQuery] int? pageSize)
+        {
+            var products = await _productService.GetProductsWithVariantsAsync(category, search, minPrice, maxPrice, sortBy, isOnSale, page, pageSize);
             return Ok(products);
         }
 
