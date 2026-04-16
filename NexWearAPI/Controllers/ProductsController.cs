@@ -1,7 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NexWearAPI.Constants;
 using NexWearAPI.DTOs;
+using NexWearAPI.Extensions;
 using NexWearAPI.Services;
+using System.Security.Claims;
 
 namespace NexWearAPI.Controllers
 {
@@ -12,13 +15,17 @@ namespace NexWearAPI.Controllers
         private readonly IProductService _productService;
         private readonly IImageService _imageService;
         private readonly ILogger<ProductsController> _logger;
+        private readonly IAuditService _auditService;
 
-        public ProductsController(IProductService productService, IImageService imageService, ILogger<ProductsController> logger)
+        public ProductsController(IProductService productService, IImageService imageService, ILogger<ProductsController> logger, IAuditService auditService)
         {
             _productService = productService;
             _imageService = imageService;
             _logger = logger;
+            _auditService = auditService;
         }
+
+        private Guid GetUserId() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
 
         /// <summary>Listar todos los productos activos (público)</summary>
         // A01 - Endpoint público, cualquiera puede ver productos
@@ -38,6 +45,10 @@ namespace NexWearAPI.Controllers
             return Ok(products);
         }
 
+        /// <summary>
+        ///     Listar todos los productos activos y sus variantes, se utilizará más que nada para obtener los productos
+        ///     pero con el filtrado de oferta y así obtener solo las variantes en ofertas (público)
+        /// </summary>
         [AllowAnonymous]
         [HttpGet("with-variants")]
         public async Task<IActionResult> GetAllWithVariants(
@@ -73,15 +84,11 @@ namespace NexWearAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
         {
-            // A08 - Validaciones del DTO se ejecutan automáticamente
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
+            if (!ModelState.IsValid) return BadRequest(ModelState);
             var product = await _productService.CreateAsync(dto);
-
-            // A09 - Log de creación de producto
-            _logger.LogInformation("Producto creado: {Name} a las {Time}", dto.Name, DateTime.UtcNow);
-
+            await _auditService.LogAsync(AuditActions.PRODUCT_CREATED, AuditCategories.Product, "SUCCESS",
+                new { productId = product.Id, name = dto.Name, category = dto.Category },
+                userId: GetUserId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
             return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
         }
 
@@ -90,16 +97,12 @@ namespace NexWearAPI.Controllers
         [HttpPut("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductDto dto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
+            if (!ModelState.IsValid) return BadRequest(ModelState);
             var product = await _productService.UpdateAsync(id, dto);
-
-            if (product is null)
-                return NotFound(new { message = "Producto no encontrado." });
-
-            _logger.LogInformation("Producto actualizado: {Id} a las {Time}", id, DateTime.UtcNow);
-
+            if (product is null) return NotFound(new { message = "Producto no encontrado." });
+            await _auditService.LogAsync(AuditActions.PRODUCT_UPDATED, AuditCategories.Product, "SUCCESS",
+                new { productId = id },
+                userId: GetUserId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
             return Ok(product);
         }
 
@@ -109,12 +112,10 @@ namespace NexWearAPI.Controllers
         public async Task<IActionResult> Delete(Guid id)
         {
             var result = await _productService.DeleteAsync(id);
-
-            if (!result)
-                return NotFound(new { message = "Producto no encontrado." });
-
-            _logger.LogInformation("Producto desactivado: {Id} a las {Time}", id, DateTime.UtcNow);
-
+            if (!result) return NotFound(new { message = "Producto no encontrado." });
+            await _auditService.LogAsync(AuditActions.PRODUCT_DELETED, AuditCategories.Product, "SUCCESS",
+                new { productId = id },
+                userId: GetUserId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
             return NoContent();
         }
 

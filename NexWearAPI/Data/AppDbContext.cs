@@ -17,6 +17,7 @@ namespace NexWearAPI.Data
         public DbSet<ProductVariant> ProductVariants { get; set; }
         public DbSet<Address> Addresses { get; set; }
         public DbSet<PasswordResetCode> PasswordResetCodes { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -176,6 +177,22 @@ namespace NexWearAPI.Data
 
             modelBuilder.Entity<PasswordResetCode>()
                 .HasIndex(p => p.UserId);
+
+            // ── AuditLogs ─────────────────────────────────────────────────
+            modelBuilder.Entity<AuditLog>()
+                .HasOne(a => a.User)
+                .WithMany()
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.SetNull);  // Si el usuario se elimina, el log se conserva
+
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(a => a.CreatedAt);        // Para ordenar eficientemente
+
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(a => a.Action);           // Para filtrar por tipo de accion
+
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(a => a.UserId);           // Para filtrar por usuario
         }
     }
 }

@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NexWearAPI.Constants;
 using NexWearAPI.DTOs;
+using NexWearAPI.Extensions;
 using NexWearAPI.Services;
 using System.Security.Claims;
 
@@ -13,22 +15,24 @@ namespace NexWearAPI.Controllers
     {
         private readonly IOrderService _orderService;
         private readonly ILogger<OrdersController> _logger;
+        private readonly IAuditService _auditService;
 
-        public OrdersController(IOrderService orderService, ILogger<OrdersController> logger)
+        public OrdersController(IOrderService orderService, ILogger<OrdersController> logger, IAuditService auditService)
         {
             _orderService = orderService;
             _logger = logger;
+            _auditService = auditService;
         }
 
         private Guid GetUserId() =>
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
                 ?? User.FindFirstValue("sub")!);
 
-        // ── Checkout con Mercado Pago ─────────────────────────────────────────────
+        // ── Checkout ─────────────────────────────────────────────
 
         /// <summary>
         /// Procesa el pago y registra la orden.
-        /// El frontend manda el token de tarjeta generado por MP.js y la dirección.
+        /// El frontend manda el token de tarjeta generado y la dirección.
         /// </summary>
         [HttpPost("checkout")]
         public async Task<IActionResult> Checkout([FromBody] StripeCheckoutDto dto)
@@ -37,16 +41,17 @@ namespace NexWearAPI.Controllers
             try
             {
                 var order = await _orderService.CheckoutAsync(GetUserId(), dto);
+                await _auditService.LogAsync(AuditActions.ORDER_CREATED, AuditCategories.Order, "SUCCESS",
+                    new { orderId = order.Id, total = order.Total, items = order.Items.Count() },
+                    userId: GetUserId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
                 return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
             }
             catch (InvalidOperationException ex)
             {
+                await _auditService.LogAsync(AuditActions.ORDER_CREATED, AuditCategories.Order, "ERROR",
+                    new { razon = ex.Message },
+                    userId: GetUserId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
                 return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error en checkout MP");
-                return StatusCode(500, new { message = "Error al procesar el pago. Intenta de nuevo." });
             }
         }
 

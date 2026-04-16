@@ -15,6 +15,13 @@ namespace NexWearAPI.Services
         Task<AdminOrdersResponseDto> GetOrdersAsync(int page, int pageSize, string? status);
         Task<AdminOrderResponseDto?> GetOrderByIdAsync(Guid orderId);
         Task<AdminOrderResponseDto?> UpdateOrderStatusAsync(Guid orderId, string status);
+
+        // Auditlogs
+        Task<AuditLogsResponseDto> GetAuditLogsAsync(
+            int page, int pageSize,
+            string? action, string? category,
+            string? result, string? search,
+            DateTime? from, DateTime? to);
     }
 
     public class AdminService : IAdminService
@@ -235,5 +242,65 @@ namespace NexWearAPI.Services
                 Total        = i.UnitPrice * i.Quantity,
             })
         };
+
+        public async Task<AuditLogsResponseDto> GetAuditLogsAsync(
+            int page, int pageSize,
+            string? action, string? category,
+            string? result, string? search,
+            DateTime? from, DateTime? to)
+        {
+            var query = _context.AuditLogs.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(action))
+                query = query.Where(l => l.Action == action);
+
+            if (!string.IsNullOrWhiteSpace(category))
+                query = query.Where(l => l.Category == category);
+
+            if (!string.IsNullOrWhiteSpace(result))
+                query = query.Where(l => l.Result == result);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.ToLower();
+                query = query.Where(l =>
+                    (l.UserEmail != null && l.UserEmail.ToLower().Contains(s)) ||
+                    (l.Details != null && l.Details.ToLower().Contains(s)) ||
+                    l.Action.ToLower().Contains(s));
+            }
+
+            if (from.HasValue) query = query.Where(l => l.CreatedAt >= from.Value);
+            if (to.HasValue) query = query.Where(l => l.CreatedAt <= to.Value);
+
+            var total = await query.CountAsync();
+
+            var logs = await query
+                .OrderByDescending(l => l.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(l => new AuditLogResponseDto
+                {
+                    Id = l.Id,
+                    UserEmail = l.UserEmail,
+                    UserId = l.UserId,
+                    Action = l.Action,
+                    Category = l.Category,
+                    Result = l.Result,
+                    Details = l.Details,
+                    IpAddress = l.IpAddress,
+                    UserAgent = l.UserAgent,
+                    CreatedAt = l.CreatedAt,
+                })
+                .ToListAsync();
+
+            return new AuditLogsResponseDto
+            {
+                Logs = logs,
+                Total = total,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling((double)total / pageSize),
+            };
+        }
     }
 }

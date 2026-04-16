@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NexWearAPI.Constants;
 using NexWearAPI.DTOs;
+using NexWearAPI.Extensions;
 using NexWearAPI.Services;
 using System.Security.Claims;
 
@@ -13,20 +15,26 @@ namespace NexWearAPI.Controllers
         private readonly IReviewService _reviewService;
         private readonly IImageService _imageService;
         private readonly ILogger<ReviewsController> _logger;
+        private readonly IAuditService _auditService;
 
         public ReviewsController(
             IReviewService reviewService,
             IImageService imageService,
-            ILogger<ReviewsController> logger)
+            ILogger<ReviewsController> logger,
+            IAuditService auditService)
         {
             _reviewService = reviewService;
             _imageService = imageService;
             _logger = logger;
+            _auditService = auditService;
         }
 
         private Guid GetUserId() =>
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
                 ?? User.FindFirstValue("sub")!);
+
+        private Guid GetAdminId() =>
+            Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
 
         private bool IsAdmin() =>
             User.IsInRole("Admin");
@@ -58,11 +66,16 @@ namespace NexWearAPI.Controllers
             try
             {
                 var review = await _reviewService.CreateAsync(GetUserId(), dto);
-                _logger.LogInformation("Reseña creada: {ReviewId} por usuario {UserId}", review.Id, GetUserId());
+                await _auditService.LogAsync(AuditActions.REVIEW_CREATED, AuditCategories.Review, "SUCCESS",
+                    new { reviewId = review.Id, productId = dto.ProductId, rating = dto.Rating },
+                    userId: GetUserId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
                 return CreatedAtAction(nameof(GetByProduct), new { productId = dto.ProductId }, review);
             }
             catch (InvalidOperationException ex)
             {
+                await _auditService.LogAsync(AuditActions.REVIEW_CREATED, AuditCategories.Review, "ERROR",
+                    new { razon = ex.Message, productId = dto.ProductId },
+                    userId: GetUserId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
                 return BadRequest(new { message = ex.Message });
             }
         }
@@ -123,9 +136,9 @@ namespace NexWearAPI.Controllers
             var review = await _reviewService.ModerateAsync(reviewId, dto);
             if (review is null) return NotFound(new { message = "Reseña no encontrada." });
 
-            _logger.LogInformation("Reseña {ReviewId} {Action} por admin",
-                reviewId, dto.Approved ? "aprobada" : "rechazada");
-
+            await _auditService.LogAsync(AuditActions.ADMIN_REVIEW_MODERATED, AuditCategories.Admin, "SUCCESS",
+                new { reviewId, approved = dto.Approved },
+                userId: GetAdminId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
             return Ok(review);
         }
 
@@ -136,6 +149,9 @@ namespace NexWearAPI.Controllers
         {
             var result = await _reviewService.DeleteAsync(GetUserId(), reviewId, IsAdmin());
             if (!result) return NotFound(new { message = "Reseña no encontrada." });
+            await _auditService.LogAsync(AuditActions.REVIEW_DELETED, AuditCategories.Review, "SUCCESS",
+                new { reviewId, deletedByAdmin = IsAdmin() },
+                userId: GetUserId(), ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
             return NoContent();
         }
 

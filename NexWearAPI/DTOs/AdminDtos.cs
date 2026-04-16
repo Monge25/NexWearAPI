@@ -86,4 +86,28 @@
         [System.ComponentModel.DataAnnotations.Required]
         public string Role { get; set; } = string.Empty;
     }
+
+    // Auditlogs
+    public class AuditLogResponseDto
+    {
+        public Guid Id { get; set; }
+        public string? UserEmail { get; set; }
+        public Guid? UserId { get; set; }
+        public string Action { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string Result { get; set; } = string.Empty;
+        public string? Details { get; set; }
+        public string? IpAddress { get; set; }
+        public string? UserAgent { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class AuditLogsResponseDto
+    {
+        public IEnumerable<AuditLogResponseDto> Logs { get; set; } = new List<AuditLogResponseDto>();
+        public int Total { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages { get; set; }
+    }
 }
