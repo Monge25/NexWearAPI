@@ -16,12 +16,14 @@ namespace NexWearAPI.Controllers
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
         private readonly IAuditService _auditService;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger, IAuditService auditService)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger, IAuditService auditService, IServiceScopeFactory scopeFactory)
         {
             _authService = authService;
             _logger = logger;
             _auditService = auditService;
+            _scopeFactory = scopeFactory;
         }
 
         /// <summary>Registrar un nuevo usuario</summary>
@@ -88,14 +90,31 @@ namespace NexWearAPI.Controllers
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            // Captura ANTES del Task.Run — HttpContext no es accesible desde otro thread
+            var ipAddress = HttpContext.GetIpAddress();
+            var userAgent = HttpContext.GetUserAgent();
+
+            // ✅ Scope propio = DbContext propio, sin competencia con el request
             _ = Task.Run(async () =>
             {
-                try { await _authService.ForgotPasswordAsync(dto); }
+                using var scope = _scopeFactory.CreateScope();
+                var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
+                try { await authService.ForgotPasswordAsync(dto); }
                 catch (Exception ex) { _logger.LogError("Error enviando email: {Error}", ex.Message); }
             });
-            _ = _auditService.LogAsync(AuditActions.PASSWORD_RESET_REQUEST, AuditCategories.Auth, "SUCCESS",
+
+            // ✅ await para que el contexto del request siga vivo
+            await _auditService.LogAsync(
+                AuditActions.PASSWORD_RESET_REQUEST,
+                AuditCategories.Auth,
+                "SUCCESS",
                 new { email = dto.Email },
-                userEmail: dto.Email, ipAddress: HttpContext.GetIpAddress(), userAgent: HttpContext.GetUserAgent());
+                userEmail: dto.Email,
+                ipAddress: ipAddress,
+                userAgent: userAgent
+            );
+
             return Ok(new { message = "Si el email está registrado, recibirá un código en breve." });
         }
 

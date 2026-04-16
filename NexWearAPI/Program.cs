@@ -96,7 +96,7 @@ builder.Services.AddScoped<IStripeService, StripeService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
-builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IAuditService, AuditService>();  
 
 builder.Services.AddHttpClient();
 
