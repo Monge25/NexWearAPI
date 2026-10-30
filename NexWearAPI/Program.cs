@@ -77,7 +77,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "https://nexwear.pages.dev")
+        policy.WithOrigins(
+                  "http://localhost:3000", "http://localhost:5173", "https://nexwear.pages.dev",
+                  // PWA de la actividad (Live Server de VS Code)
+                  "http://127.0.0.1:5500", "http://localhost:5500")
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
